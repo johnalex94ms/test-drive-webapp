@@ -1,0 +1,84 @@
+.rbc-calendar {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    color: #051620;
+}
+
+.rbc-toolbar button {
+    color: #051620;
+    border-color: #e5e5e5;
+}
+
+.rbc-toolbar button.rbc-active,
+.rbc-toolbar button:hover {
+    background-color: #051620;
+    border-color: #051620;
+    color: white;
+}
+
+.rbc-today {
+    background-color: #f8f8f8;
+}
+
+.rbc-off-range-bg {
+    background: #fafafa;
+}
+
+.rbc-header {
+    font-weight: 600;
+    padding: 8px 0;
+    text-transform: capitalize;
+    color: #051620;
+}
+
+.rbc-event {
+    background-color: #051620;
+    border: none;
+    font-size: 11px;
+}
+
+.rbc-day-bg.dia-ocupado {
+    background-color: #fdecec;
+}
+
+.rbc-day-bg.dia-deshabilitado {
+    background-color: #fafafa;
+    cursor: not-allowed;
+}
+
+.rbc-day-bg.dia-libre {
+    background-color: #eaf6ec;
+}
+
+.rbc-day-bg.dia-ocupado-parcial {
+    background-color: #fdecec;
+}
+
+.rbc-day-bg.dia-lleno {
+    background-color: #fafafa;
+}
+
+.rbc-day-bg.dia-bloqueado {
+    background-color: #f8caca;
+}
+
+.rbc-day-bg.dia-libre,
+.rbc-day-bg.dia-ocupado-parcial {
+    cursor: pointer;
+}
+
+.rbc-day-bg.dia-lleno,
+.rbc-day-bg.dia-bloqueado {
+    cursor: not-allowed;
+}
+
+.rbc-day-bg.dia-libre:hover {
+    background-color: #d4ecd8;
+}
+
+.rbc-day-bg.dia-ocupado-parcial:hover {
+    background-color: #f9d2d2;
+}
+
+.rbc-day-bg.dia-seleccionado {
+    background-color: #051620;
+}
