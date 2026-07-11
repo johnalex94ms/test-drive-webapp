@@ -1,35 +1,64 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { obtenerImagenes360 } from '../../lib/vehiculoImagenes';
 
 interface Vehiculo360Props {
     modelo: string;
+    imagenes?: string[];
     fallbackUrl?: string;
     className?: string;
 }
 
-export function Vehiculo360({ modelo, fallbackUrl, className }: Vehiculo360Props) {
-    const imagenes = obtenerImagenes360(modelo);
+export function Vehiculo360({ modelo, imagenes, fallbackUrl, className }: Vehiculo360Props) {
+    const imagenesFinal = imagenes && imagenes.length > 0 ? imagenes : obtenerImagenes360(modelo);
     const [indice, setIndice] = useState(0);
+    const [pausado, setPausado] = useState(false);
     const arrastrando = useRef(false);
     const inicioX = useRef(0);
+    const intervaloRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const reanudarTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    if (!imagenes || imagenes.length === 0) {
+    useEffect(() => {
+        setIndice(0);
+    }, [modelo]);
+
+    useEffect(() => {
+        if (!imagenesFinal || imagenesFinal.length <= 1 || pausado) return;
+
+        intervaloRef.current = setInterval(() => {
+            setIndice((i) => (i + 1) % imagenesFinal.length);
+        }, 1400);
+
+        return () => {
+            if (intervaloRef.current) clearInterval(intervaloRef.current);
+        };
+    }, [imagenesFinal, pausado]);
+
+    function pausarTemporalmente() {
+        setPausado(true);
+        if (reanudarTimeoutRef.current) clearTimeout(reanudarTimeoutRef.current);
+        reanudarTimeoutRef.current = setTimeout(() => setPausado(false), 4000);
+    }
+
+    if (!imagenesFinal || imagenesFinal.length === 0) {
         if (!fallbackUrl) return null;
         return <img src={fallbackUrl} alt={'KIA ' + modelo} className={className} />;
     }
 
     function siguiente() {
-        setIndice((i) => (i + 1) % imagenes.length);
+        pausarTemporalmente();
+        setIndice((i) => (i + 1) % imagenesFinal.length);
     }
 
     function anterior() {
-        setIndice((i) => (i - 1 + imagenes.length) % imagenes.length);
+        pausarTemporalmente();
+        setIndice((i) => (i - 1 + imagenesFinal.length) % imagenesFinal.length);
     }
 
     function onPointerDown(e: React.PointerEvent) {
         arrastrando.current = true;
         inicioX.current = e.clientX;
+        pausarTemporalmente();
     }
 
     function onPointerMove(e: React.PointerEvent) {
@@ -49,9 +78,10 @@ export function Vehiculo360({ modelo, fallbackUrl, className }: Vehiculo360Props
     return (
         <div className={'relative select-none ' + (className || '')}>
             <img
-                src={imagenes[indice]}
+                key={indice}
+                src={imagenesFinal[indice]}
                 alt={'KIA ' + modelo}
-                className="w-full h-full object-contain cursor-grab active:cursor-grabbing"
+                className="w-full h-full object-contain cursor-grab active:cursor-grabbing animate-fade-rotate"
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
@@ -59,31 +89,35 @@ export function Vehiculo360({ modelo, fallbackUrl, className }: Vehiculo360Props
                 draggable={false}
             />
 
-            <button
-                type="button"
-                onClick={anterior}
-                className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 cursor-pointer"
-            >
-                <ChevronLeft className="w-4 h-4 text-[#051620]" />
-            </button>
-            <button
-                type="button"
-                onClick={siguiente}
-                className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 cursor-pointer"
-            >
-                <ChevronRight className="w-4 h-4 text-[#051620]" />
-            </button>
+            {imagenesFinal.length > 1 && (
+                <>
+                    <button
+                        type="button"
+                        onClick={anterior}
+                        className="absolute left-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4 text-[#051620]" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={siguiente}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 cursor-pointer"
+                    >
+                        <ChevronRight className="w-4 h-4 text-[#051620]" />
+                    </button>
 
-            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
-                {imagenes.map((_, i) => (
-                    <span
-                        key={i}
-                        className={
-                            'w-1.5 h-1.5 rounded-full ' + (i === indice ? 'bg-[#051620]' : 'bg-[#051620]/25')
-                        }
-                    />
-                ))}
-            </div>
+                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+                        {imagenesFinal.map((_, i) => (
+                            <span
+                                key={i}
+                                className={
+                                    'w-1.5 h-1.5 rounded-full transition-colors ' + (i === indice ? 'bg-[#051620]' : 'bg-[#051620]/25')
+                                }
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

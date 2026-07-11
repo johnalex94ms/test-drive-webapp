@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car } from 'lucide-react';
+import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
@@ -31,6 +31,14 @@ function reproducirSonido() {
     } catch {
         // navegador sin soporte de audio, se ignora
     }
+}
+
+function obtenerIniciales(nombre: string) {
+    if (!nombre) return '?';
+    const partes = nombre.trim().split(' ');
+    const a = partes[0] ? partes[0][0] : '';
+    const b = partes[1] ? partes[1][0] : '';
+    return (a + b).toUpperCase();
 }
 
 export default function AdminLayout() {
@@ -125,7 +133,7 @@ export default function AdminLayout() {
                     }
                 }
             )
-            .subscribe((status) => console.log('Estado canal admin-notificaciones:', status));
+            .subscribe();
 
         return () => {
             supabase.removeChannel(canal);
@@ -199,19 +207,30 @@ export default function AdminLayout() {
                         </button>
                     )}
                     {permiso === 'granted' && (
-                        <p className="flex items-center gap-2 text-xs text-white/40">
+                        <p className="flex items-center justify-center gap-2 text-xs text-white/40">
                             <Bell className="w-3.5 h-3.5" />
                             Notificaciones activas
                         </p>
                     )}
+
                     {perfil && (
-                        <p className="text-xs text-white/40">{perfil.nombre}</p>
+                        <div className="flex items-center gap-2.5 pt-3 border-t border-white/10">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
+                                {obtenerIniciales(perfil.nombre)}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium text-white truncate">{perfil.nombre}</p>
+                                <p className="text-[10px] text-white/40 truncate">{perfil.rol === 'super_admin' ? 'Super admin' : 'Admin'}</p>
+                            </div>
+                        </div>
                     )}
+
                     <button
                         type="button"
                         onClick={cerrarSesion}
-                        className="text-sm text-white/60 hover:text-white transition-colors cursor-pointer text-left"
+                        className="flex items-center gap-2 text-sm text-white/60 hover:text-red-400 transition-colors cursor-pointer bg-white/5 hover:bg-red-500/10 rounded-sm px-3 py-2"
                     >
+                        <LogOut className="w-3.5 h-3.5" />
                         Cerrar sesion
                     </button>
                 </div>

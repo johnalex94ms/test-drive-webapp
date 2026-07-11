@@ -32,6 +32,7 @@ interface VehiculoConSpecs extends Vehiculo {
     motor?: string;
     potencia?: string;
     tipo_cambio?: string;
+    imagenes_360?: string[];
 }
 
 export function StepVehiculo() {
@@ -99,8 +100,9 @@ export function StepVehiculo() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {filtrados.map((v) => {
                             const foto = FOTOS[v.modelo];
+                            const imagenesDb = v.imagenes_360 || [];
                             const imagenesLocal = obtenerImagenes360(v.modelo);
-                            const fotoFinal = imagenesLocal.length > 0 ? imagenesLocal[0] : foto;
+                            const fotoFinal = imagenesDb.length > 0 ? imagenesDb[0] : (imagenesLocal.length > 0 ? imagenesLocal[0] : foto);
                             const activo = vehiculo?.id === v.id;
                             const hover = hoverId === v.id;
                             return (
@@ -164,6 +166,7 @@ export function StepVehiculo() {
                         <div className="h-48 bg-[#0a2030] flex items-center justify-center p-6">
                             <Vehiculo360
                                 modelo={seleccionado.modelo}
+                                imagenes={seleccionado.imagenes_360}
                                 fallbackUrl={FOTOS[seleccionado.modelo]}
                                 className="h-full w-full"
                             />

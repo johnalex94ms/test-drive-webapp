@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil, Trash2, X, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 const CATEGORIAS = [
@@ -20,6 +21,7 @@ interface VehiculoForm {
     velocidad_max: string;
     tipo_cambio: string;
     activo: boolean;
+    imagenes: string[];
 }
 
 function formVacio(sedeDefault: string): VehiculoForm {
@@ -33,6 +35,7 @@ function formVacio(sedeDefault: string): VehiculoForm {
         velocidad_max: '',
         tipo_cambio: 'Automatico',
         activo: true,
+        imagenes: [],
     };
 }
 
@@ -42,6 +45,7 @@ export default function VehiculosAdminPage() {
     const [guardando, setGuardando] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [vehiculoAEliminar, setVehiculoAEliminar] = useState<any>(null);
+    const [subiendoImagenes, setSubiendoImagenes] = useState(false);
     const queryClient = useQueryClient();
 
     const sedesQuery = useQuery({
@@ -81,9 +85,55 @@ export default function VehiculosAdminPage() {
             velocidad_max: v.velocidad_max || '',
             tipo_cambio: v.tipo_cambio || 'Automatico',
             activo: v.activo,
+            imagenes: v.imagenes_360 || [],
         });
         setErrorMsg(null);
         setModalAbierto(true);
+    }
+
+    async function subirImagenVehiculo(file: File): Promise<string | null> {
+        const ext = file.name.split('.').pop();
+        const path = 'vehiculos/' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext;
+        const res = await supabase.storage.from('fotos-vehiculos').upload(path, file, { contentType: file.type });
+        if (res.error) return null;
+        const publicUrlData = supabase.storage.from('fotos-vehiculos').getPublicUrl(path);
+        return publicUrlData.data.publicUrl;
+    }
+
+    async function handleSeleccionarImagenes(e: React.ChangeEvent<HTMLInputElement>) {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        setSubiendoImagenes(true);
+        const espacioDisponible = 4 - form.imagenes.length;
+        const filesAUsar = files.slice(0, espacioDisponible);
+        const urls: string[] = [];
+
+        for (const file of filesAUsar) {
+            const url = await subirImagenVehiculo(file);
+            if (url) urls.push(url);
+        }
+
+        setForm((f) => ({ ...f, imagenes: [...f.imagenes, ...urls] }));
+        setSubiendoImagenes(false);
+        e.target.value = '';
+    }
+
+    async function quitarImagen(index: number) {
+        const url = form.imagenes[index];
+        setForm((f) => ({ ...f, imagenes: f.imagenes.filter((_, i) => i !== index) }));
+
+        if (url) {
+            try {
+                const partes = url.split('/fotos-vehiculos/');
+                const path = partes[1];
+                if (path) {
+                    await supabase.storage.from('fotos-vehiculos').remove([path]);
+                }
+            } catch {
+
+            }
+        }
     }
 
     async function guardar() {
@@ -106,6 +156,7 @@ export default function VehiculosAdminPage() {
                 velocidad_max: form.velocidad_max || null,
                 tipo_cambio: form.tipo_cambio || null,
                 activo: form.activo,
+                imagenes_360: form.imagenes,
             };
 
             if (form.id) {
@@ -171,6 +222,7 @@ export default function VehiculosAdminPage() {
                                 <th className="px-4 py-3">Placa</th>
                                 <th className="px-4 py-3">Categoria</th>
                                 <th className="px-4 py-3">Sede</th>
+                                <th className="px-4 py-3">Fotos</th>
                                 <th className="px-4 py-3">Estado</th>
                                 <th className="px-4 py-3"></th>
                             </tr>
@@ -182,6 +234,9 @@ export default function VehiculosAdminPage() {
                                     <td className="px-4 py-3 text-[#666]">{v.placa}</td>
                                     <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
                                     <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
+                                    <td className="px-4 py-3 text-[#666]">
+                                        {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
                                             {v.activo ? 'Activo' : 'Inactivo'}
@@ -191,15 +246,17 @@ export default function VehiculosAdminPage() {
                                         <button
                                             type="button"
                                             onClick={() => abrirEditar(v)}
-                                            className="text-xs font-medium text-[#051620] mr-3 cursor-pointer hover:underline"
+                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
                                         >
+                                            <Pencil className="w-3.5 h-3.5" />
                                             Editar
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setVehiculoAEliminar(v)}
-                                            className="text-xs font-medium text-red-600 cursor-pointer hover:underline"
+                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
                                         >
+                                            <Trash2 className="w-3.5 h-3.5" />
                                             Eliminar
                                         </button>
                                     </td>
@@ -217,6 +274,49 @@ export default function VehiculosAdminPage() {
                         <p className="font-display text-lg font-bold text-[#051620] mb-4">
                             {form.id ? 'Editar vehiculo' : 'Nuevo vehiculo'}
                         </p>
+
+                        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+                            Fotos 360 (hasta 4)
+                        </p>
+                        <div className="grid grid-cols-4 gap-2 mb-4">
+                            {[0, 1, 2, 3].map((i) => {
+                                const url = form.imagenes[i];
+                                return (
+                                    <div key={i} className="aspect-square relative">
+                                        {url ? (
+                                            <>
+                                                <img src={url} alt={'Foto ' + (i + 1)} className="w-full h-full object-cover rounded-sm border border-[#e5e5e5]" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => quitarImagen(i)}
+                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center cursor-pointer"
+                                                >
+                                                    <X className="w-3 h-3 text-white" />
+                                                </button>
+                                            </>
+                                        ) : i === form.imagenes.length ? (
+                                            <label
+                                                htmlFor="fotos-vehiculo"
+                                                className="w-full h-full rounded-sm border border-dashed border-[#e5e5e5] flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-[#051620] bg-[#f8f8f8]"
+                                            >
+                                                <Upload className="w-4 h-4 text-[#999]" />
+                                                <span className="text-[10px] text-[#999]">{subiendoImagenes ? '...' : 'Subir'}</span>
+                                            </label>
+                                        ) : (
+                                            <div className="w-full h-full rounded-sm bg-[#f8f8f8] border border-[#e5e5e5]" />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <input
+                            id="fotos-vehiculo"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleSeleccionarImagenes}
+                        />
 
                         <div className="flex flex-col gap-3 mb-4">
                             <select

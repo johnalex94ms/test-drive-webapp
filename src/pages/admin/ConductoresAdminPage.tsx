@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { FotoCropModal } from '../../components/admin/FotoCropModal';
+import { Pencil, Trash2 } from 'lucide-react';
 
 interface ConductorForm {
     id?: string;
@@ -97,13 +98,28 @@ export default function ConductoresAdminPage() {
     async function subirFotoRecortada(blob: Blob) {
         setSubiendoFoto(true);
         try {
+            const fotoAnterior = form.foto_url;
+
             const path = 'conductores/' + Date.now() + '.jpg';
             const res = await supabase.storage.from('fotos-conductores').upload(path, blob, {
                 contentType: 'image/jpeg',
             });
+
             if (!res.error) {
                 const publicUrlData = supabase.storage.from('fotos-conductores').getPublicUrl(path);
                 setForm((f) => ({ ...f, foto_url: publicUrlData.data.publicUrl }));
+
+                if (fotoAnterior) {
+                    try {
+                        const partes = fotoAnterior.split('/fotos-conductores/');
+                        const pathAnterior = partes[1];
+                        if (pathAnterior) {
+                            await supabase.storage.from('fotos-conductores').remove([pathAnterior]);
+                        }
+                    } catch {
+
+                    }
+                }
             }
         } finally {
             setSubiendoFoto(false);
@@ -234,15 +250,17 @@ export default function ConductoresAdminPage() {
                                         <button
                                             type="button"
                                             onClick={() => abrirEditar(c)}
-                                            className="text-xs font-medium text-[#051620] mr-3 cursor-pointer hover:underline"
+                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
                                         >
+                                            <Pencil className="w-3.5 h-3.5" />
                                             Editar
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setConductorAEliminar(c)}
-                                            className="text-xs font-medium text-red-600 cursor-pointer hover:underline"
+                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
                                         >
+                                            <Trash2 className="w-3.5 h-3.5" />
                                             Eliminar
                                         </button>
                                     </td>
