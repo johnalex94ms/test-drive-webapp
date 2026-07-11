@@ -9,6 +9,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import ReservasAdminPage from './pages/admin/ReservasAdminPage';
 import CalendarioAdminPage from './pages/admin/CalendarioAdminPage';
 import ConductoresAdminPage from './pages/admin/ConductoresAdminPage';
+import VehiculosAdminPage from './pages/admin/VehiculosAdminPage';
 import ReportesAdminPage from './pages/admin/ReportesAdminPage';
 
 const queryClient = new QueryClient({
@@ -35,6 +36,7 @@ export default function App() {
             <Route index element={<ReservasAdminPage />} />
             <Route path="calendario" element={<CalendarioAdminPage />} />
             <Route path="conductores" element={<ConductoresAdminPage />} />
+            <Route path="vehiculos" element={<VehiculosAdminPage />} />
             <Route path="reportes" element={<ReportesAdminPage />} />
           </Route>
 

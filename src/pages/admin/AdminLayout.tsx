@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3 } from 'lucide-react';
+import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
@@ -8,6 +8,7 @@ import iconoNotificacion from '../../assets/images/notificaciones/imagen_notific
 const LINKS = [
     { to: '/admin', label: 'Reservas', icon: ClipboardList },
     { to: '/admin/calendario', label: 'Calendario', icon: CalendarDays },
+    { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
     { to: '/admin/conductores', label: 'Conductores', icon: Users },
     { to: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
 ];

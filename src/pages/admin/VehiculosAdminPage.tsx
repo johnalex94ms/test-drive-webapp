@@ -1,0 +1,368 @@
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabaseClient';
+
+const CATEGORIAS = [
+    { value: 'automovil', label: 'Automovil' },
+    { value: 'camioneta', label: 'Camioneta' },
+    { value: 'hibrido', label: 'Hibrido' },
+    { value: 'electrico', label: 'Electrico' },
+];
+
+interface VehiculoForm {
+    id?: string;
+    sede_id: string;
+    modelo: string;
+    placa: string;
+    categoria: string;
+    motor: string;
+    potencia: string;
+    velocidad_max: string;
+    tipo_cambio: string;
+    activo: boolean;
+}
+
+function formVacio(sedeDefault: string): VehiculoForm {
+    return {
+        sede_id: sedeDefault,
+        modelo: '',
+        placa: '',
+        categoria: 'automovil',
+        motor: '',
+        potencia: '',
+        velocidad_max: '',
+        tipo_cambio: 'Automatico',
+        activo: true,
+    };
+}
+
+export default function VehiculosAdminPage() {
+    const [modalAbierto, setModalAbierto] = useState(false);
+    const [form, setForm] = useState<VehiculoForm>(formVacio(''));
+    const [guardando, setGuardando] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [vehiculoAEliminar, setVehiculoAEliminar] = useState<any>(null);
+    const queryClient = useQueryClient();
+
+    const sedesQuery = useQuery({
+        queryKey: ['admin-sedes-lista'],
+        queryFn: async () => {
+            const res = await supabase.from('sedes').select('*').order('nombre');
+            return res.data || [];
+        },
+    });
+
+    const vehiculosQuery = useQuery({
+        queryKey: ['admin-vehiculos'],
+        queryFn: async () => {
+            const res = await supabase.from('vehiculos').select('*, sedes(nombre)').order('modelo');
+            return res.data || [];
+        },
+    });
+
+    const sedes = sedesQuery.data || [];
+    const vehiculos = vehiculosQuery.data || [];
+
+    function abrirNuevo() {
+        setForm(formVacio(sedes[0]?.id || ''));
+        setErrorMsg(null);
+        setModalAbierto(true);
+    }
+
+    function abrirEditar(v: any) {
+        setForm({
+            id: v.id,
+            sede_id: v.sede_id,
+            modelo: v.modelo,
+            placa: v.placa,
+            categoria: v.categoria || 'automovil',
+            motor: v.motor || '',
+            potencia: v.potencia || '',
+            velocidad_max: v.velocidad_max || '',
+            tipo_cambio: v.tipo_cambio || 'Automatico',
+            activo: v.activo,
+        });
+        setErrorMsg(null);
+        setModalAbierto(true);
+    }
+
+    async function guardar() {
+        if (!form.modelo.trim() || !form.placa.trim() || !form.sede_id) {
+            setErrorMsg('Modelo, placa y sede son obligatorios.');
+            return;
+        }
+
+        setGuardando(true);
+        setErrorMsg(null);
+
+        try {
+            const payload = {
+                sede_id: form.sede_id,
+                modelo: form.modelo.trim(),
+                placa: form.placa.trim().toUpperCase(),
+                categoria: form.categoria,
+                motor: form.motor || null,
+                potencia: form.potencia || null,
+                velocidad_max: form.velocidad_max || null,
+                tipo_cambio: form.tipo_cambio || null,
+                activo: form.activo,
+            };
+
+            if (form.id) {
+                const res = await supabase.from('vehiculos').update(payload).eq('id', form.id);
+                if (res.error) throw res.error;
+            } else {
+                const res = await supabase.from('vehiculos').insert(payload);
+                if (res.error) throw res.error;
+            }
+
+            queryClient.invalidateQueries({ queryKey: ['admin-vehiculos'] });
+            setModalAbierto(false);
+        } catch (err: any) {
+            setErrorMsg(err.code === '23505' ? 'Esa placa ya esta registrada.' : 'Ocurrio un error al guardar.');
+        } finally {
+            setGuardando(false);
+        }
+    }
+
+    async function eliminar() {
+        if (!vehiculoAEliminar) return;
+        setGuardando(true);
+        try {
+            const res = await supabase.from('vehiculos').delete().eq('id', vehiculoAEliminar.id);
+            if (res.error) throw res.error;
+            queryClient.invalidateQueries({ queryKey: ['admin-vehiculos'] });
+            setVehiculoAEliminar(null);
+        } catch {
+            setErrorMsg('No se pudo eliminar, tiene pruebas de ruta asociadas. Puedes desactivarlo en su lugar.');
+        } finally {
+            setGuardando(false);
+        }
+    }
+
+    return (
+        <div>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="font-display text-2xl font-bold text-[#051620]">Vehiculos</h1>
+                    <p className="text-sm text-[#666]">Gestiona el catalogo de vehiculos disponibles para prueba.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={abrirNuevo}
+                    className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
+                >
+                    + Nuevo vehiculo
+                </button>
+            </div>
+
+            {vehiculosQuery.isLoading ? (
+                <p className="text-sm text-[#666]">Cargando...</p>
+            ) : vehiculos.length === 0 ? (
+                <p className="text-sm text-[#666] bg-white border border-[#e5e5e5] rounded-sm p-6 text-center">
+                    No hay vehiculos creados todavia.
+                </p>
+            ) : (
+                <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
+                            <tr>
+                                <th className="px-4 py-3">Modelo</th>
+                                <th className="px-4 py-3">Placa</th>
+                                <th className="px-4 py-3">Categoria</th>
+                                <th className="px-4 py-3">Sede</th>
+                                <th className="px-4 py-3">Estado</th>
+                                <th className="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {vehiculos.map((v: any) => (
+                                <tr key={v.id} className="border-t border-[#e5e5e5]">
+                                    <td className="px-4 py-3 font-medium text-[#051620]">KIA {v.modelo}</td>
+                                    <td className="px-4 py-3 text-[#666]">{v.placa}</td>
+                                    <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
+                                    <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
+                                            {v.activo ? 'Activo' : 'Inactivo'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => abrirEditar(v)}
+                                            className="text-xs font-medium text-[#051620] mr-3 cursor-pointer hover:underline"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setVehiculoAEliminar(v)}
+                                            className="text-xs font-medium text-red-600 cursor-pointer hover:underline"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Modal crear/editar */}
+            {modalAbierto && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+                        <p className="font-display text-lg font-bold text-[#051620] mb-4">
+                            {form.id ? 'Editar vehiculo' : 'Nuevo vehiculo'}
+                        </p>
+
+                        <div className="flex flex-col gap-3 mb-4">
+                            <select
+                                value={form.sede_id}
+                                onChange={(e) => setForm({ ...form, sede_id: e.target.value })}
+                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                            >
+                                {sedes.map((s: any) => (
+                                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                                ))}
+                            </select>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Modelo (ej. Sportage)"
+                                    value={form.modelo}
+                                    onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Placa"
+                                    value={form.placa}
+                                    onChange={(e) => setForm({ ...form, placa: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                            </div>
+
+                            <select
+                                value={form.categoria}
+                                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                            >
+                                {CATEGORIAS.map((c) => (
+                                    <option key={c.value} value={c.value}>{c.label}</option>
+                                ))}
+                            </select>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Motor (ej. 1.6T)"
+                                    value={form.motor}
+                                    onChange={(e) => setForm({ ...form, motor: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Potencia (ej. 180 hp)"
+                                    value={form.potencia}
+                                    onChange={(e) => setForm({ ...form, potencia: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Vel. maxima (ej. 200 km/h)"
+                                    value={form.velocidad_max}
+                                    onChange={(e) => setForm({ ...form, velocidad_max: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Cambios (ej. Automatico)"
+                                    value={form.tipo_cambio}
+                                    onChange={(e) => setForm({ ...form, tipo_cambio: e.target.value })}
+                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                />
+                            </div>
+
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.activo}
+                                    onChange={(e) => setForm({ ...form, activo: e.target.checked })}
+                                    className="cursor-pointer"
+                                />
+                                <span className="text-sm text-[#051620]">Vehiculo activo (visible para agendar)</span>
+                            </label>
+                        </div>
+
+                        {errorMsg && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3 mb-4">
+                                {errorMsg}
+                            </p>
+                        )}
+
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setModalAbierto(false)}
+                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={guardando}
+                                onClick={guardar}
+                                className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                            >
+                                {guardando ? 'Guardando...' : 'Guardar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal eliminar */}
+            {vehiculoAEliminar && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
+                        <p className="font-display text-lg font-bold text-[#051620] mb-2">
+                            Eliminar KIA {vehiculoAEliminar.modelo}?
+                        </p>
+                        <p className="text-sm text-[#666] mb-6">
+                            Esta accion no se puede deshacer.
+                        </p>
+                        {errorMsg && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3 mb-4">
+                                {errorMsg}
+                            </p>
+                        )}
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => { setVehiculoAEliminar(null); setErrorMsg(null); }}
+                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={guardando}
+                                onClick={eliminar}
+                                className="bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {guardando ? 'Eliminando...' : 'Si, eliminar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
