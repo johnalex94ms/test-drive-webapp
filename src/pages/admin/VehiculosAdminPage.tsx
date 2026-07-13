@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
 
@@ -318,6 +318,20 @@ export default function VehiculosAdminPage() {
                         <option value="inactivo">Inactivos</option>
                     </select>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setBusqueda('');
+                        setSedeFiltro('todas');
+                        setCategoriaFiltro('todas');
+                        setEstadoFiltro('todos');
+                    }}
+                    title="Restablecer filtros"
+                    className="w-9 h-9 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] cursor-pointer flex-shrink-0"
+                >
+                    <RotateCcw className="w-4 h-4 text-[#666]" />
+                </button>
 
                 <p className="text-xs text-[#999] whitespace-nowrap pb-2">
                     {vehiculos.length} de {vehiculosBase.length}

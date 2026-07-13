@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
-import { FileSpreadsheet, Radio } from 'lucide-react';
+import { FileSpreadsheet, Radio, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
 import ExcelJS from 'exceljs';
@@ -300,6 +300,19 @@ export default function ReportesAdminPage() {
                         ))}
                     </select>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setDesde(haceNDias(30));
+                        setHasta(hoyISO());
+                        setSedeFiltro('todas');
+                    }}
+                    title="Restablecer filtros"
+                    className="w-9 h-9 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] cursor-pointer"
+                >
+                    <RotateCcw className="w-4 h-4 text-[#666]" />
+                </button>
 
                 <div className="flex gap-2 ml-auto">
                     <button

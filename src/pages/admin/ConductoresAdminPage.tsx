@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, Trash2, Search, ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet } from 'lucide-react';
+import ExcelJS from 'exceljs';
 import { supabase } from '../../lib/supabaseClient';
 import { FotoCropModal } from '../../components/admin/FotoCropModal';
 import { Input } from '../../components/ui/Input';
@@ -231,6 +232,49 @@ export default function ConductoresAdminPage() {
         }
     }
 
+    async function exportarExcel() {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Distrikia';
+        workbook.created = new Date();
+
+        const hoja = workbook.addWorksheet('Conductores');
+        hoja.columns = [
+            { header: 'Nombre', key: 'nombre', width: 26 },
+            { header: 'Correo', key: 'correo', width: 30 },
+            { header: 'Cargo', key: 'cargo', width: 24 },
+            { header: 'Sedes', key: 'sedes', width: 30 },
+            { header: 'Estado', key: 'estado', width: 12 },
+        ];
+
+        const encabezado = hoja.getRow(1);
+        encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF051620' } };
+
+        conductores.forEach((c: any) => {
+            hoja.addRow({
+                nombre: c.nombre,
+                correo: c.correo,
+                cargo: c.cargo || '',
+                sedes: (c.conductores_sedes || []).map((cs: any) => cs.sedes?.nombre).filter(Boolean).join(', '),
+                estado: c.activo ? 'Activo' : 'Inactivo',
+            });
+        });
+
+        hoja.views = [{ state: 'frozen', ySplit: 1 }];
+        hoja.autoFilter = { from: 'A1', to: 'E1' };
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.setAttribute('href', url);
+        enlace.setAttribute('download', 'conductores-distrikia.xlsx');
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+        URL.revokeObjectURL(url);
+    }
+
     return (
         <div>
             <div className="mb-6 flex items-center justify-between">
@@ -238,13 +282,24 @@ export default function ConductoresAdminPage() {
                     <h1 className="font-display text-2xl font-bold text-[#051620]">Conductores</h1>
                     <p className="text-sm text-[#666]">Gestiona los expertos y su asignacion por sede.</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={abrirNuevo}
-                    className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
-                >
-                    + Nuevo conductor
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={exportarExcel}
+                        disabled={conductores.length === 0}
+                        className="inline-flex items-center gap-2 border border-[#e5e5e5] text-[#051620] text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:border-[#051620] disabled:opacity-40"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        Exportar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={abrirNuevo}
+                        className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
+                    >
+                        + Nuevo conductor
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6 flex items-end gap-3 flex-wrap">
@@ -296,6 +351,19 @@ export default function ConductoresAdminPage() {
                         <option value="inactivo">Inactivos</option>
                     </select>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setBusqueda('');
+                        setSedeFiltro('todas');
+                        setEstadoFiltro('todos');
+                    }}
+                    title="Restablecer filtros"
+                    className="w-9 h-9 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] cursor-pointer"
+                >
+                    <RotateCcw className="w-4 h-4 text-[#666]" />
+                </button>
 
                 <p className="text-xs text-[#999] whitespace-nowrap pb-2">
                     {conductores.length} de {conductoresBase.length}

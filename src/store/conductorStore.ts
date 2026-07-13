@@ -6,6 +6,7 @@ interface ConductorPerfil {
     correo: string;
     cargo: string;
     foto_url: string | null;
+    clave_cambiada: boolean;
 }
 
 interface ConductorStore {

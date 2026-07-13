@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
 
@@ -124,13 +125,76 @@ export default function CalendarioAdminPage() {
         return reserva;
     }
 
+    async function exportarExcel() {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Distrikia';
+        workbook.created = new Date();
+
+        const hoja = workbook.addWorksheet('Calendario ' + fecha);
+        hoja.columns = [
+            { header: 'Vehiculo', key: 'vehiculo', width: 22 },
+            { header: 'Placa', key: 'placa', width: 12 },
+            { header: 'Sede', key: 'sede', width: 20 },
+            ...HORARIOS_BASE.map((h) => ({ header: h, key: h, width: 26 })),
+        ];
+
+        const encabezado = hoja.getRow(1);
+        encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF051620' } };
+
+        vehiculos.forEach((v: any) => {
+            const fila: any = {
+                vehiculo: 'KIA ' + v.modelo,
+                placa: v.placa,
+                sede: v.sedes ? v.sedes.nombre : '',
+            };
+
+            HORARIOS_BASE.forEach((h) => {
+                const reserva = buscarReserva(v.id, h);
+                if (reserva) {
+                    const estado = ESTILO_ESTADO[reserva.estado]?.label || reserva.estado;
+                    fila[h] = reserva.cliente_nombre + ' ' + (reserva.cliente_apellido || '') + ' (' + estado + ')' +
+                        (reserva.conductores ? ' - ' + reserva.conductores.nombre : '');
+                } else {
+                    fila[h] = '';
+                }
+            });
+
+            hoja.addRow(fila);
+        });
+
+        hoja.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.setAttribute('href', url);
+        enlace.setAttribute('download', 'calendario-distrikia_' + fecha + '.xlsx');
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+        URL.revokeObjectURL(url);
+    }
+
     const cargando = vehiculosQuery.isLoading || reservasDiaQuery.isLoading;
 
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="font-display text-2xl font-bold text-[#051620]">Calendario</h1>
-                <p className="text-sm text-[#666]">Disponibilidad de vehiculos por horario, dia a dia.</p>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="font-display text-2xl font-bold text-[#051620]">Calendario</h1>
+                    <p className="text-sm text-[#666]">Disponibilidad de vehiculos por horario, dia a dia.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={exportarExcel}
+                    disabled={vehiculos.length === 0}
+                    className="inline-flex items-center gap-2 bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-40"
+                >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Exportar Excel
+                </button>
             </div>
 
             {/* Controles */}
@@ -215,6 +279,19 @@ export default function CalendarioAdminPage() {
                         ))}
                     </select>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setSedeFiltro('todas');
+                        setVehiculoFiltro('todos');
+                        setConductorFiltro('todos');
+                    }}
+                    title="Restablecer filtros"
+                    className="w-9 h-9 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] cursor-pointer"
+                >
+                    <RotateCcw className="w-4 h-4 text-[#666]" />
+                </button>
 
                 <p className="text-sm text-[#666] capitalize ml-auto self-center">
                     {formatearFechaBonita(fecha)}

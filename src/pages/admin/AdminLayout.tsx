@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car, LogOut } from 'lucide-react';
+import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
+import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car, LogOut, X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
+import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
 
 const LINKS = [
     { to: '/admin', label: 'Reservas', icon: ClipboardList },
@@ -41,11 +42,30 @@ function obtenerIniciales(nombre: string) {
     return (a + b).toUpperCase();
 }
 
+interface Toast {
+    id: number;
+    titulo: string;
+    mensaje: string;
+}
+
 export default function AdminLayout() {
     const navigate = useNavigate();
     const { perfil, cargando, setPerfil } = useAdminStore();
     const [pendientes, setPendientes] = useState(0);
     const [permiso, setPermiso] = useState<NotificationPermission>('default');
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    function mostrarToast(titulo: string, mensaje: string) {
+        const id = Date.now();
+        setToasts((actuales) => [...actuales, { id, titulo, mensaje }]);
+        setTimeout(() => {
+            setToasts((actuales) => actuales.filter((t) => t.id !== id));
+        }, 20000);
+    }
+
+    function cerrarToast(id: number) {
+        setToasts((actuales) => actuales.filter((t) => t.id !== id));
+    }
 
     useEffect(() => {
         async function verificar() {
@@ -102,6 +122,7 @@ export default function AdminLayout() {
                     const cliente = payload.new.cliente_nombre || 'Un cliente';
 
                     reproducirSonido();
+                    mostrarToast('Nueva prueba de ruta', cliente + ' agendo una prueba y espera aprobacion.');
 
                     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification('Nueva prueba de ruta', {
@@ -124,9 +145,12 @@ export default function AdminLayout() {
 
                     if (fueReprogramada) {
                         reproducirSonido();
+                        const cliente = actual.cliente_nombre || 'Un cliente';
+                        mostrarToast('Prueba reprogramada', cliente + ' cambio su fecha a ' + actual.fecha + ' ' + (actual.hora_inicio || '').slice(0, 5));
+
                         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                             new Notification('Prueba reprogramada', {
-                                body: (actual.cliente_nombre || 'Un cliente') + ' cambio su fecha a ' + actual.fecha + ' ' + (actual.hora_inicio || '').slice(0, 5),
+                                body: cliente + ' cambio su fecha a ' + actual.fecha + ' ' + (actual.hora_inicio || '').slice(0, 5),
                                 icon: iconoNotificacion,
                             });
                         }
@@ -164,10 +188,10 @@ export default function AdminLayout() {
         <div className="min-h-screen bg-[#f8f8f8] flex">
             <aside className="w-56 bg-[#051620] flex flex-col justify-between py-6">
                 <div>
-                    <div className="px-5 mb-8">
-                        <p className="text-xs text-white/40 uppercase tracking-widest">Distrikia</p>
+                    <Link to="/admin" className="px-5 mb-8 block hover:opacity-80 transition-opacity">
+                        <img src={logoDistrikia} alt="Distrikia" className="h-5 mb-2" />
                         <p className="font-display text-lg font-bold text-white">Panel admin</p>
-                    </div>
+                    </Link>
                     <nav className="flex flex-col gap-1 px-3">
                         {LINKS.map((link) => {
                             const Icon = link.icon;
@@ -207,7 +231,7 @@ export default function AdminLayout() {
                         </button>
                     )}
                     {permiso === 'granted' && (
-                        <p className="flex items-center justify-center gap-2 text-xs text-white/40">
+                        <p className="flex items-center gap-2 text-xs text-white/40">
                             <Bell className="w-3.5 h-3.5" />
                             Notificaciones activas
                         </p>
@@ -239,6 +263,31 @@ export default function AdminLayout() {
             <main className="flex-1 p-8">
                 <Outlet />
             </main>
+
+            {/* Toasts de notificacion */}
+            <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 max-w-sm">
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        className="bg-[#051620] text-white rounded-sm shadow-lg p-4 flex items-start gap-3 animate-fade-rotate"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                            <Bell className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold">{toast.titulo}</p>
+                            <p className="text-xs text-white/60 mt-0.5">{toast.mensaje}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => cerrarToast(toast.id)}
+                            className="text-white/40 hover:text-white cursor-pointer flex-shrink-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
