@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { FotoCropModal } from '../../components/admin/FotoCropModal';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Input } from '../../components/ui/Input';
+
+const PORPAGINA = 10;
 
 interface ConductorForm {
     id?: string;
@@ -17,7 +20,7 @@ interface ConductorForm {
 const FORM_VACIO: ConductorForm = {
     nombre: '',
     correo: '',
-    cargo: 'Experto de producto KIA',
+    cargo: '',
     activo: true,
     foto_url: null,
     sedesSeleccionadas: [],
@@ -32,6 +35,10 @@ export default function ConductoresAdminPage() {
     const queryClient = useQueryClient();
     const [imagenTemporal, setImagenTemporal] = useState<string | null>(null);
     const [subiendoFoto, setSubiendoFoto] = useState(false);
+    const [busqueda, setBusqueda] = useState('');
+    const [sedeFiltro, setSedeFiltro] = useState('todas');
+    const [estadoFiltro, setEstadoFiltro] = useState('todos');
+    const [pagina, setPagina] = useState(1);
 
     const sedesQuery = useQuery({
         queryKey: ['admin-sedes-lista'],
@@ -53,7 +60,26 @@ export default function ConductoresAdminPage() {
     });
 
     const sedes = sedesQuery.data || [];
-    const conductores = conductoresQuery.data || [];
+    const conductoresBase = conductoresQuery.data || [];
+
+    const conductores = conductoresBase.filter((c: any) => {
+        const coincideTexto = busqueda.trim() === '' ||
+            c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+            c.correo.toLowerCase().includes(busqueda.toLowerCase());
+        const coincideSede = sedeFiltro === 'todas' ||
+            (c.conductores_sedes || []).some((cs: any) => cs.sede_id === sedeFiltro);
+        const coincideEstado = estadoFiltro === 'todos' ||
+            (estadoFiltro === 'activo' && c.activo) ||
+            (estadoFiltro === 'inactivo' && !c.activo);
+        return coincideTexto && coincideSede && coincideEstado;
+    });
+
+    const totalPaginas = Math.max(1, Math.ceil(conductores.length / PORPAGINA));
+    const conductoresPagina = conductores.slice((pagina - 1) * PORPAGINA, pagina * PORPAGINA);
+
+    useEffect(() => {
+        setPagina(1);
+    }, [busqueda, sedeFiltro, estadoFiltro]);
 
     function abrirNuevo() {
         setForm(FORM_VACIO);
@@ -66,7 +92,7 @@ export default function ConductoresAdminPage() {
             id: c.id,
             nombre: c.nombre,
             correo: c.correo,
-            cargo: c.cargo || 'Experto de producto KIA',
+            cargo: c.cargo || '',
             activo: c.activo,
             foto_url: c.foto_url || null,
             sedesSeleccionadas: (c.conductores_sedes || []).map((cs: any) => cs.sede_id),
@@ -117,7 +143,7 @@ export default function ConductoresAdminPage() {
                             await supabase.storage.from('fotos-conductores').remove([pathAnterior]);
                         }
                     } catch {
-
+                        // si falla el borrado de la foto vieja, no bloqueamos el guardado
                     }
                 }
             }
@@ -138,6 +164,7 @@ export default function ConductoresAdminPage() {
 
         try {
             let conductorId = form.id;
+            let esNuevo = false;
 
             if (conductorId) {
                 const res = await supabase
@@ -153,6 +180,7 @@ export default function ConductoresAdminPage() {
                     .single();
                 if (res.error) throw res.error;
                 conductorId = res.data.id;
+                esNuevo = true;
             }
 
             await supabase.from('conductores_sedes').delete().eq('conductor_id', conductorId);
@@ -161,6 +189,22 @@ export default function ConductoresAdminPage() {
                 const filas = form.sedesSeleccionadas.map((sedeId) => ({ conductor_id: conductorId, sede_id: sedeId }));
                 const res = await supabase.from('conductores_sedes').insert(filas);
                 if (res.error) throw res.error;
+            }
+
+            if (esNuevo) {
+                try {
+                    const sesionActual = await supabase.auth.getSession();
+                    await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/crear-conductor', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: 'Bearer ' + sesionActual.data.session?.access_token,
+                        },
+                        body: JSON.stringify({ conductorId, nombre: form.nombre, correo: form.correo }),
+                    });
+                } catch {
+                    // si falla la creacion de la cuenta, el conductor ya quedo guardado, se puede reintentar despues
+                }
             }
 
             queryClient.invalidateQueries({ queryKey: ['admin-conductores'] });
@@ -203,72 +247,155 @@ export default function ConductoresAdminPage() {
                 </button>
             </div>
 
+            <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6 flex items-end gap-3 flex-wrap">
+                <div className="flex-1 min-w-[180px]">
+                    <label className="text-xs text-[#666] block mb-1">Buscar</label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#999] pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Nombre o correo..."
+                            value={busqueda}
+                            onChange={(e) => setBusqueda(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] focus:ring-2 focus:ring-[#051620]/20"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-xs text-[#666] block mb-1">Sede</label>
+                    <select
+                        value={sedeFiltro}
+                        onChange={(e) => setSedeFiltro(e.target.value)}
+                        className="pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                        style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 10px center',
+                        }}
+                    >
+                        <option value="todas">Todas las sedes</option>
+                        {sedes.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.nombre}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="text-xs text-[#666] block mb-1">Estado</label>
+                    <select
+                        value={estadoFiltro}
+                        onChange={(e) => setEstadoFiltro(e.target.value)}
+                        className="pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                        style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 10px center',
+                        }}
+                    >
+                        <option value="todos">Todos</option>
+                        <option value="activo">Activos</option>
+                        <option value="inactivo">Inactivos</option>
+                    </select>
+                </div>
+
+                <p className="text-xs text-[#999] whitespace-nowrap pb-2">
+                    {conductores.length} de {conductoresBase.length}
+                </p>
+            </div>
+
             {conductoresQuery.isLoading ? (
                 <p className="text-sm text-[#666]">Cargando...</p>
             ) : conductores.length === 0 ? (
                 <p className="text-sm text-[#666] bg-white border border-[#e5e5e5] rounded-sm p-6 text-center">
-                    No hay conductores creados todavia.
+                    No hay conductores que coincidan con los filtros.
                 </p>
             ) : (
-                <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
-                            <tr>
-                                <th className="px-4 py-3">Foto</th>
-                                <th className="px-4 py-3">Nombre</th>
-                                <th className="px-4 py-3">Correo</th>
-                                <th className="px-4 py-3">Cargo</th>
-                                <th className="px-4 py-3">Sedes</th>
-                                <th className="px-4 py-3">Estado</th>
-                                <th className="px-4 py-3"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {conductores.map((c: any) => (
-                                <tr key={c.id} className="border-t border-[#e5e5e5]">
-                                    <td className="px-4 py-3">
-                                        {c.foto_url ? (
-                                            <img src={c.foto_url} alt={c.nombre} className="w-9 h-9 rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center text-xs text-[#999]">
-                                                {c.nombre ? c.nombre[0].toUpperCase() : '?'}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 font-medium text-[#051620]">{c.nombre}</td>
-                                    <td className="px-4 py-3 text-[#666]">{c.correo}</td>
-                                    <td className="px-4 py-3 text-[#666]">{c.cargo}</td>
-                                    <td className="px-4 py-3 text-[#666]">
-                                        {(c.conductores_sedes || []).map((cs: any) => cs.sedes?.nombre).filter(Boolean).join(', ') || '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (c.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
-                                            {c.activo ? 'Activo' : 'Inactivo'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                                        <button
-                                            type="button"
-                                            onClick={() => abrirEditar(c)}
-                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
-                                        >
-                                            <Pencil className="w-3.5 h-3.5" />
-                                            Editar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setConductorAEliminar(c)}
-                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            Eliminar
-                                        </button>
-                                    </td>
+                <>
+                    <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
+                                <tr>
+                                    <th className="px-4 py-3">Foto</th>
+                                    <th className="px-4 py-3">Nombre</th>
+                                    <th className="px-4 py-3">Correo</th>
+                                    <th className="px-4 py-3">Cargo</th>
+                                    <th className="px-4 py-3">Sedes</th>
+                                    <th className="px-4 py-3">Estado</th>
+                                    <th className="px-4 py-3"></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {conductoresPagina.map((c: any) => (
+                                    <tr key={c.id} className="border-t border-[#e5e5e5]">
+                                        <td className="px-4 py-3">
+                                            {c.foto_url ? (
+                                                <img src={c.foto_url} alt={c.nombre} className="w-9 h-9 rounded-full object-cover" />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-full bg-[#f0f0f0] flex items-center justify-center text-xs text-[#999]">
+                                                    {c.nombre ? c.nombre[0].toUpperCase() : '?'}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 font-medium text-[#051620]">{c.nombre}</td>
+                                        <td className="px-4 py-3 text-[#666]">{c.correo}</td>
+                                        <td className="px-4 py-3 text-[#666]">{c.cargo}</td>
+                                        <td className="px-4 py-3 text-[#666]">
+                                            {(c.conductores_sedes || []).map((cs: any) => cs.sedes?.nombre).filter(Boolean).join(', ') || '—'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (c.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
+                                                {c.activo ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => abrirEditar(c)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                                Editar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setConductorAEliminar(c)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {totalPaginas > 1 && (
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-xs text-[#666]">
+                                Pagina {pagina} de {totalPaginas}
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                                    disabled={pagina === 1}
+                                    className="w-8 h-8 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-[#051620]" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                                    disabled={pagina === totalPaginas}
+                                    className="w-8 h-8 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-[#051620]" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Modal crear/editar */}
@@ -306,26 +433,23 @@ export default function ConductoresAdminPage() {
                         </div>
 
                         <div className="flex flex-col gap-3 mb-4">
-                            <input
+                            <Input
                                 type="text"
                                 placeholder="Nombre completo"
                                 value={form.nombre}
                                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                             />
-                            <input
+                            <Input
                                 type="email"
                                 placeholder="Correo"
                                 value={form.correo}
                                 onChange={(e) => setForm({ ...form, correo: e.target.value })}
-                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                             />
-                            <input
+                            <Input
                                 type="text"
-                                placeholder="Cargo"
+                                placeholder="Cargo (ej. Experto de producto KIA)"
                                 value={form.cargo}
                                 onChange={(e) => setForm({ ...form, cargo: e.target.value })}
-                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                             />
 
                             <label className="flex items-center gap-2 cursor-pointer">

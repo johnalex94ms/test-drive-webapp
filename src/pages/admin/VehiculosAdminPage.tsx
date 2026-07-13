@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, X, Upload } from 'lucide-react';
+import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { Input } from '../../components/ui/Input';
 
 const CATEGORIAS = [
     { value: 'automovil', label: 'Automovil' },
@@ -9,6 +10,8 @@ const CATEGORIAS = [
     { value: 'hibrido', label: 'Hibrido' },
     { value: 'electrico', label: 'Electrico' },
 ];
+
+const PORPAGINA = 10;
 
 interface VehiculoForm {
     id?: string;
@@ -33,7 +36,7 @@ function formVacio(sedeDefault: string): VehiculoForm {
         motor: '',
         potencia: '',
         velocidad_max: '',
-        tipo_cambio: 'Automatico',
+        tipo_cambio: '',
         activo: true,
         imagenes: [],
     };
@@ -46,6 +49,11 @@ export default function VehiculosAdminPage() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [vehiculoAEliminar, setVehiculoAEliminar] = useState<any>(null);
     const [subiendoImagenes, setSubiendoImagenes] = useState(false);
+    const [busqueda, setBusqueda] = useState('');
+    const [sedeFiltro, setSedeFiltro] = useState('todas');
+    const [categoriaFiltro, setCategoriaFiltro] = useState('todas');
+    const [estadoFiltro, setEstadoFiltro] = useState('todos');
+    const [pagina, setPagina] = useState(1);
     const queryClient = useQueryClient();
 
     const sedesQuery = useQuery({
@@ -65,7 +73,26 @@ export default function VehiculosAdminPage() {
     });
 
     const sedes = sedesQuery.data || [];
-    const vehiculos = vehiculosQuery.data || [];
+    const vehiculosBase = vehiculosQuery.data || [];
+
+    const vehiculos = vehiculosBase.filter((v: any) => {
+        const coincideTexto = busqueda.trim() === '' ||
+            v.modelo.toLowerCase().includes(busqueda.toLowerCase()) ||
+            v.placa.toLowerCase().includes(busqueda.toLowerCase());
+        const coincideSede = sedeFiltro === 'todas' || v.sede_id === sedeFiltro;
+        const coincideCategoria = categoriaFiltro === 'todas' || v.categoria === categoriaFiltro;
+        const coincideEstado = estadoFiltro === 'todos' ||
+            (estadoFiltro === 'activo' && v.activo) ||
+            (estadoFiltro === 'inactivo' && !v.activo);
+        return coincideTexto && coincideSede && coincideCategoria && coincideEstado;
+    });
+
+    const totalPaginas = Math.max(1, Math.ceil(vehiculos.length / PORPAGINA));
+    const vehiculosPagina = vehiculos.slice((pagina - 1) * PORPAGINA, pagina * PORPAGINA);
+
+    useEffect(() => {
+        setPagina(1);
+    }, [busqueda, sedeFiltro, categoriaFiltro, estadoFiltro]);
 
     function abrirNuevo() {
         setForm(formVacio(sedes[0]?.id || ''));
@@ -83,8 +110,25 @@ export default function VehiculosAdminPage() {
             motor: v.motor || '',
             potencia: v.potencia || '',
             velocidad_max: v.velocidad_max || '',
-            tipo_cambio: v.tipo_cambio || 'Automatico',
+            tipo_cambio: v.tipo_cambio || '',
             activo: v.activo,
+            imagenes: v.imagenes_360 || [],
+        });
+        setErrorMsg(null);
+        setModalAbierto(true);
+    }
+
+    function duplicarVehiculo(v: any) {
+        setForm({
+            sede_id: v.sede_id,
+            modelo: v.modelo,
+            placa: '',
+            categoria: v.categoria || 'automovil',
+            motor: v.motor || '',
+            potencia: v.potencia || '',
+            velocidad_max: v.velocidad_max || '',
+            tipo_cambio: v.tipo_cambio || '',
+            activo: true,
             imagenes: v.imagenes_360 || [],
         });
         setErrorMsg(null);
@@ -131,7 +175,7 @@ export default function VehiculosAdminPage() {
                     await supabase.storage.from('fotos-vehiculos').remove([path]);
                 }
             } catch {
-
+                // si falla el borrado fisico, no bloqueamos la edicion del formulario
             }
         }
     }
@@ -207,64 +251,172 @@ export default function VehiculosAdminPage() {
                 </button>
             </div>
 
+            <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6 flex items-end gap-3 flex-wrap">
+                <div className="flex-1 min-w-[180px]">
+                    <label className="text-xs text-[#666] block mb-1">Buscar</label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#999] pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Modelo o placa..."
+                            value={busqueda}
+                            onChange={(e) => setBusqueda(e.target.value)}
+                            className="w-full pl-9 pr-3 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] focus:ring-2 focus:ring-[#051620]/20"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-xs text-[#666] block mb-1">Sede</label>
+                    <select
+                        value={sedeFiltro}
+                        onChange={(e) => setSedeFiltro(e.target.value)}
+                        className="pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                        style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 10px center',
+                        }}
+                    >
+                        <option value="todas">Todas las sedes</option>
+                        {sedes.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.nombre}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="text-xs text-[#666] block mb-1">Categoria</label>
+                    <select
+                        value={categoriaFiltro}
+                        onChange={(e) => setCategoriaFiltro(e.target.value)}
+                        className="pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                        style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 10px center',
+                        }}
+                    >
+                        <option value="todas">Todas</option>
+                        {CATEGORIAS.map((c) => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="text-xs text-[#666] block mb-1">Estado</label>
+                    <select
+                        value={estadoFiltro}
+                        onChange={(e) => setEstadoFiltro(e.target.value)}
+                        className="pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                        style={{
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                            backgroundPosition: 'right 10px center',
+                        }}
+                    >
+                        <option value="todos">Todos</option>
+                        <option value="activo">Activos</option>
+                        <option value="inactivo">Inactivos</option>
+                    </select>
+                </div>
+
+                <p className="text-xs text-[#999] whitespace-nowrap pb-2">
+                    {vehiculos.length} de {vehiculosBase.length}
+                </p>
+            </div>
+
             {vehiculosQuery.isLoading ? (
                 <p className="text-sm text-[#666]">Cargando...</p>
             ) : vehiculos.length === 0 ? (
                 <p className="text-sm text-[#666] bg-white border border-[#e5e5e5] rounded-sm p-6 text-center">
-                    No hay vehiculos creados todavia.
+                    No hay vehiculos que coincidan con los filtros.
                 </p>
             ) : (
-                <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
-                            <tr>
-                                <th className="px-4 py-3">Modelo</th>
-                                <th className="px-4 py-3">Placa</th>
-                                <th className="px-4 py-3">Categoria</th>
-                                <th className="px-4 py-3">Sede</th>
-                                <th className="px-4 py-3">Fotos</th>
-                                <th className="px-4 py-3">Estado</th>
-                                <th className="px-4 py-3"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {vehiculos.map((v: any) => (
-                                <tr key={v.id} className="border-t border-[#e5e5e5]">
-                                    <td className="px-4 py-3 font-medium text-[#051620]">KIA {v.modelo}</td>
-                                    <td className="px-4 py-3 text-[#666]">{v.placa}</td>
-                                    <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
-                                    <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
-                                    <td className="px-4 py-3 text-[#666]">
-                                        {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
-                                            {v.activo ? 'Activo' : 'Inactivo'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                                        <button
-                                            type="button"
-                                            onClick={() => abrirEditar(v)}
-                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
-                                        >
-                                            <Pencil className="w-3.5 h-3.5" />
-                                            Editar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setVehiculoAEliminar(v)}
-                                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            Eliminar
-                                        </button>
-                                    </td>
+                <>
+                    <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
+                                <tr>
+                                    <th className="px-4 py-3">Modelo</th>
+                                    <th className="px-4 py-3">Placa</th>
+                                    <th className="px-4 py-3">Categoria</th>
+                                    <th className="px-4 py-3">Sede</th>
+                                    <th className="px-4 py-3">Fotos</th>
+                                    <th className="px-4 py-3">Estado</th>
+                                    <th className="px-4 py-3"></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {vehiculosPagina.map((v: any) => (
+                                    <tr key={v.id} className="border-t border-[#e5e5e5]">
+                                        <td className="px-4 py-3 font-medium text-[#051620]">KIA {v.modelo}</td>
+                                        <td className="px-4 py-3 text-[#666]">{v.placa}</td>
+                                        <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
+                                        <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
+                                        <td className="px-4 py-3 text-[#666]">
+                                            {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
+                                                {v.activo ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => duplicarVehiculo(v)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                            >
+                                                <Copy className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => abrirEditar(v)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                                Editar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setVehiculoAEliminar(v)}
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {totalPaginas > 1 && (
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-xs text-[#666]">
+                                Pagina {pagina} de {totalPaginas}
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                                    disabled={pagina === 1}
+                                    className="w-8 h-8 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-[#051620]" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                                    disabled={pagina === totalPaginas}
+                                    className="w-8 h-8 flex items-center justify-center border border-[#e5e5e5] rounded-sm hover:border-[#051620] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-[#051620]" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Modal crear/editar */}
@@ -322,7 +474,11 @@ export default function VehiculosAdminPage() {
                             <select
                                 value={form.sede_id}
                                 onChange={(e) => setForm({ ...form, sede_id: e.target.value })}
-                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                className="w-full pl-3 pr-9 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                                style={{
+                                    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                                    backgroundPosition: 'right 10px center',
+                                }}
                             >
                                 {sedes.map((s: any) => (
                                     <option key={s.id} value={s.id}>{s.nombre}</option>
@@ -330,26 +486,28 @@ export default function VehiculosAdminPage() {
                             </select>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Modelo (ej. Sportage)"
                                     value={form.modelo}
                                     onChange={(e) => setForm({ ...form, modelo: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Placa"
                                     value={form.placa}
                                     onChange={(e) => setForm({ ...form, placa: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
                             </div>
 
                             <select
                                 value={form.categoria}
                                 onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                                className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
+                                className="w-full pl-3 pr-9 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                                style={{
+                                    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                                    backgroundPosition: 'right 10px center',
+                                }}
                             >
                                 {CATEGORIAS.map((c) => (
                                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -357,36 +515,32 @@ export default function VehiculosAdminPage() {
                             </select>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Motor (ej. 1.6T)"
                                     value={form.motor}
                                     onChange={(e) => setForm({ ...form, motor: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Potencia (ej. 180 hp)"
                                     value={form.potencia}
                                     onChange={(e) => setForm({ ...form, potencia: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Vel. maxima (ej. 200 km/h)"
                                     value={form.velocidad_max}
                                     onChange={(e) => setForm({ ...form, velocidad_max: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
-                                <input
+                                <Input
                                     type="text"
                                     placeholder="Cambios (ej. Automatico)"
                                     value={form.tipo_cambio}
                                     onChange={(e) => setForm({ ...form, tipo_cambio: e.target.value })}
-                                    className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620]"
                                 />
                             </div>
 

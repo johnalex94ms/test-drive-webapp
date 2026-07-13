@@ -246,7 +246,7 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
             ) : conductor ? (
               <div className="flex items-center gap-3 bg-[#f8f8f8] rounded-sm p-4 mb-6">
                 <img
-                  src={fotoConductor(conductor.nombre)}
+                  src={conductor.foto_url || fotoConductor(conductor.nombre)}
                   alt={conductor.nombre}
                   className="w-14 h-14 rounded-full object-cover flex-shrink-0"
                 />

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { Copy, ExternalLink } from 'lucide-react';
+
+const SITE_URL = 'http://localhost:5173';
 
 const TABS = [
     { key: 'pendiente', label: 'Pendientes' },
@@ -31,10 +34,12 @@ function siguienteEstado(reserva: any) {
 export default function ReservasAdminPage() {
     const [tab, setTab] = useState('pendiente');
     const [seleccionada, setSeleccionada] = useState<any>(null);
-    const [accion, setAccion] = useState<'aprobar' | 'rechazar' | null>(null);
+    const [accion, setAccion] = useState<'aprobar' | 'rechazar' | 'cancelar' | null>(null);
     const [motivoRechazo, setMotivoRechazo] = useState('');
     const [procesando, setProcesando] = useState(false);
     const [licenciaAmpliada, setLicenciaAmpliada] = useState(false);
+    const [motivoCancelacion, setMotivoCancelacion] = useState('');
+    const [cambiandoConductor, setCambiandoConductor] = useState(false);
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -68,6 +73,36 @@ export default function ReservasAdminPage() {
 
     const reservas = reservasQuery.data || [];
 
+    const conductoresQuery = useQuery({
+        queryKey: ['admin-conductores-sede', seleccionada?.sede_id, seleccionada?.fecha, seleccionada?.hora_inicio],
+        enabled: !!seleccionada?.sede_id,
+        queryFn: async () => {
+            const resSede = await supabase
+                .from('conductores_sedes')
+                .select('conductor_id, conductores(*)')
+                .eq('sede_id', seleccionada.sede_id);
+
+            const candidatos = (resSede.data || [])
+                .map((cs: any) => cs.conductores)
+                .filter((c: any) => c && c.activo);
+
+            const resOcupados = await supabase
+                .from('reservas')
+                .select('conductor_id')
+                .eq('fecha', seleccionada.fecha)
+                .eq('hora_inicio', seleccionada.hora_inicio)
+                .neq('id', seleccionada.id)
+                .in('estado', ['pendiente', 'confirmada', 'en_camino', 'en_prueba']);
+
+            const ocupadosIds = new Set((resOcupados.data || []).map((r: any) => r.conductor_id));
+
+            return candidatos.map((c: any) => ({
+                ...c,
+                ocupado: ocupadosIds.has(c.id) && c.id !== seleccionada.conductor_id,
+            }));
+        },
+    });
+
     async function actualizarEstado(id: string, nuevoEstado: string, motivo?: string) {
         setProcesando(true);
         const payload: any = { estado: nuevoEstado };
@@ -80,10 +115,28 @@ export default function ReservasAdminPage() {
         setMotivoRechazo('');
     }
 
+    function abrirCancelar() {
+        setMotivoCancelacion('');
+        setAccion('cancelar');
+    }
+
+    function confirmarCancelacion() {
+        actualizarEstado(seleccionada.id, 'cancelada', motivoCancelacion);
+    }
+
     function avanzar(reserva: any) {
         const paso = siguienteEstado(reserva);
         if (!paso) return;
         actualizarEstado(reserva.id, paso.nuevo);
+    }
+
+    async function cambiarConductor(conductorId: string) {
+        setProcesando(true);
+        await supabase.from('reservas').update({ conductor_id: conductorId || null }).eq('id', seleccionada.id);
+        queryClient.invalidateQueries({ queryKey: ['admin-reservas'] });
+        setSeleccionada((s: any) => ({ ...s, conductor_id: conductorId || null }));
+        setProcesando(false);
+        setCambiandoConductor(false);
     }
 
     async function descargarLicencia(url: string, nombreCliente: string) {
@@ -101,6 +154,10 @@ export default function ReservasAdminPage() {
         } catch {
             window.open(url, '_blank');
         }
+    }
+
+    function copiarLink(texto: string) {
+        navigator.clipboard.writeText(texto);
     }
 
     return (
@@ -210,6 +267,50 @@ export default function ReservasAdminPage() {
                                     <p><strong>Ciudad:</strong> {seleccionada.ciudad}</p>
                                 </div>
 
+                                <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">Enlaces del cliente</p>
+                                <div className="flex flex-col gap-2 mb-4">
+                                    <div className="flex items-center gap-2 bg-[#f8f8f8] rounded-sm px-3 py-2">
+                                        <span className="text-xs text-[#666] flex-1 truncate">/tracker/{seleccionada.id}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => copiarLink(SITE_URL + '/tracker/' + seleccionada.id)}
+                                            className="text-[#051620] hover:text-[#0a2030] cursor-pointer"
+                                            title="Copiar link del tracker"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => window.open(SITE_URL + '/tracker/' + seleccionada.id, '_blank')}
+                                            className="text-[#051620] hover:text-[#0a2030] cursor-pointer"
+                                            title="Abrir tracker"
+                                        >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                    {seleccionada.token_gestion && (
+                                        <div className="flex items-center gap-2 bg-[#f8f8f8] rounded-sm px-3 py-2">
+                                            <span className="text-xs text-[#666] flex-1 truncate">/reserva/{seleccionada.token_gestion}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => copiarLink(SITE_URL + '/reserva/' + seleccionada.token_gestion)}
+                                                className="text-[#051620] hover:text-[#0a2030] cursor-pointer"
+                                                title="Copiar link de gestion"
+                                            >
+                                                <Copy className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => window.open(SITE_URL + '/reserva/' + seleccionada.token_gestion, '_blank')}
+                                                className="text-[#051620] hover:text-[#0a2030] cursor-pointer"
+                                                title="Abrir gestion de reserva"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">Prueba</p>
                                 <div className="text-sm text-[#051620] flex flex-col gap-1 mb-4">
                                     <p><strong>Fecha:</strong> {seleccionada.fecha} {seleccionada.hora_inicio?.slice(0, 5)}</p>
@@ -218,7 +319,39 @@ export default function ReservasAdminPage() {
                                     {seleccionada.direccion_domicilio && (
                                         <p><strong>Direccion:</strong> {seleccionada.direccion_domicilio}</p>
                                     )}
-                                    <p><strong>Conductor:</strong> {seleccionada.conductores ? seleccionada.conductores.nombre : 'Sin asignar'}</p>
+                                    <div>
+                                        <div className="flex items-center justify-between">
+                                            <p><strong>Conductor:</strong> {seleccionada.conductores ? seleccionada.conductores.nombre : 'Sin asignar'}</p>
+                                            {['confirmada', 'en_camino', 'en_prueba'].includes(seleccionada.estado) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCambiandoConductor(true)}
+                                                    className="text-xs font-medium text-[#051620] hover:underline cursor-pointer"
+                                                >
+                                                    Cambiar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {cambiandoConductor && (
+                                            <select
+                                                value={seleccionada.conductor_id || ''}
+                                                onChange={(e) => cambiarConductor(e.target.value)}
+                                                disabled={procesando}
+                                                className="w-full mt-2 pl-3 pr-9 py-2 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+                                                style={{
+                                                    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                                                    backgroundPosition: 'right 10px center',
+                                                }}
+                                            >
+                                                <option value="">Sin asignar</option>
+                                                {(conductoresQuery.data || []).map((c: any) => (
+                                                    <option key={c.id} value={c.id} disabled={c.ocupado}>
+                                                        {c.nombre}{c.ocupado ? ' (ocupado a esta hora)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {seleccionada.comentario && (
@@ -282,6 +415,16 @@ export default function ReservasAdminPage() {
                                         Aprobar reserva
                                     </button>
                                 </>
+                            )}
+
+                            {['confirmada', 'en_camino', 'en_prueba'].includes(seleccionada.estado) && (
+                                <button
+                                    type="button"
+                                    onClick={abrirCancelar}
+                                    className="text-sm text-red-600 hover:underline cursor-pointer"
+                                >
+                                    Cancelar reserva
+                                </button>
                             )}
 
                             {siguienteEstado(seleccionada) && (
@@ -368,6 +511,44 @@ export default function ReservasAdminPage() {
                                 className="bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-red-700 disabled:opacity-50"
                             >
                                 {procesando ? 'Rechazando...' : 'Si, rechazar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de confirmacion — Cancelar */}
+            {seleccionada && accion === 'cancelar' && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
+                        <p className="font-display text-lg font-bold text-[#051620] mb-2">
+                            Cancelar esta reserva?
+                        </p>
+                        <p className="text-sm text-[#666] mb-3">
+                            {seleccionada.cliente_nombre} recibira un correo confirmando la cancelacion.
+                        </p>
+                        <textarea
+                            value={motivoCancelacion}
+                            onChange={(e) => setMotivoCancelacion(e.target.value)}
+                            placeholder="Motivo (opcional, se incluye en el correo al cliente)"
+                            rows={3}
+                            className="w-full px-3 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] placeholder:text-[#aaa] focus:border-[#051620] resize-none mb-4"
+                        />
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setAccion(null)}
+                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                            >
+                                Volver
+                            </button>
+                            <button
+                                type="button"
+                                disabled={procesando}
+                                onClick={confirmarCancelacion}
+                                className="bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {procesando ? 'Cancelando...' : 'Si, cancelar'}
                             </button>
                         </div>
                     </div>

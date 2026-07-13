@@ -250,15 +250,15 @@ export default function GestionReservaPage() {
 
                 {vista === 'resumen' && (
                     <>
-                        <div className="bg-[#051620] text-white rounded-sm p-5 mb-6">
-                            <p className="text-xs opacity-60 uppercase tracking-widest mb-1">Tu prueba de ruta</p>
-                            <p className="font-display text-2xl font-bold">
+                        <div className="bg-[#051620] rounded-sm p-5 mb-6">
+                            <p className="text-xs text-white/70 uppercase tracking-widest mb-1 font-medium">Tu prueba de ruta</p>
+                            <p className="font-display text-2xl font-bold text-white">
                                 {reserva.vehiculos ? 'KIA ' + reserva.vehiculos.modelo : 'Tu KIA'}
                             </p>
-                            <p className="text-sm opacity-70 mt-1">
+                            <p className="text-sm text-white/85 mt-1">
                                 {reserva.fecha} · {reserva.hora_inicio ? reserva.hora_inicio.slice(0, 5) : ''}
                             </p>
-                            <p className="text-xs opacity-50 mt-1 capitalize">Estado: {reserva.estado}</p>
+                            <p className="text-xs text-white/70 mt-1 capitalize">Estado: {reserva.estado}</p>
                         </div>
 
                         {yaFinalizadaOCancelada ? (

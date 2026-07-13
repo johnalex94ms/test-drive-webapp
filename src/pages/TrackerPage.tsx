@@ -127,17 +127,17 @@ export default function TrackerPage() {
         <div className="min-h-screen bg-[#f8f8f8]">
             <div className="max-w-lg mx-auto px-6 py-10">
 
-                <div className={'rounded-sm p-5 mb-6 text-white ' + (cancelada || rechazada ? 'bg-[#8a1f1f]' : 'bg-[#051620]')}>
-                    <p className="text-xs opacity-60 uppercase tracking-widest mb-1">
+                <div className={'rounded-sm p-5 mb-6 ' + (cancelada || rechazada ? 'bg-[#8a1f1f]' : 'bg-[#051620]')}>
+                    <p className="text-xs text-white/70 uppercase tracking-widest mb-1 font-medium">
                         {rechazada ? 'Solicitud no aprobada' : cancelada ? 'Reserva cancelada' : 'Estado de tu prueba de ruta'}
                     </p>
-                    <p className="font-display text-2xl font-bold">
+                    <p className="font-display text-2xl font-bold text-white">
                         {vehiculo ? 'KIA ' + vehiculo.modelo : 'Tu KIA'}
                     </p>
-                    <p className="text-sm opacity-70 mt-1">
+                    <p className="text-sm text-white/85 mt-1">
                         {formatearFecha(reserva.fecha)} · {reserva.hora_inicio ? reserva.hora_inicio.slice(0, 5) : ''}
                     </p>
-                    {sede && <p className="text-xs opacity-50 mt-1">{sede.nombre}</p>}
+                    {sede && <p className="text-xs text-white/70 mt-1">{sede.nombre}</p>}
                 </div>
 
                 {rechazada && (
@@ -204,7 +204,7 @@ export default function TrackerPage() {
                 {conductor && !cancelada && !rechazada && !pendiente && (
                     <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 flex items-center gap-3 mb-6">
                         <img
-                            src={fotoConductor(conductor.nombre)}
+                            src={conductor.foto_url || fotoConductor(conductor.nombre)}
                             alt={conductor.nombre}
                             className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         />

@@ -66,25 +66,27 @@ const COLOMBIA_CENTER: [number, number] = [6.2442, -75.5812];
 
 interface Props {
     onCobertura: (tiene: boolean, direccion: string, coords: [number, number]) => void;
+    ciudad?: string;
 }
 
 function MoverMapa({ coords }: { coords: [number, number] | null }) {
     const map = useMap();
     useEffect(() => {
-        if (coords) map.flyTo(coords, 14, { duration: 1.2 });
+        if (coords) map.flyTo(coords, 16, { duration: 1.2 });
     }, [coords, map]);
     return null;
 }
 
 const iconUsuario = L.divIcon({
     className: '',
-    html: `<div style="
-    width:16px;height:16px;border-radius:50%;
-    background:#051620;border:3px solid white;
-    box-shadow:0 2px 8px rgba(0,0,0,.4)
-  "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: `
+    <svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));">
+      <path d="M17 0C7.6 0 0 7.6 0 17c0 12.4 17 27 17 27s17-14.6 17-27C34 7.6 26.4 0 17 0z" fill="#051620"/>
+      <circle cx="17" cy="17" r="6.5" fill="white"/>
+    </svg>
+  `,
+    iconSize: [34, 44],
+    iconAnchor: [17, 44],
 });
 
 const iconSede = L.divIcon({
@@ -98,11 +100,12 @@ const iconSede = L.divIcon({
     iconAnchor: [6, 6],
 });
 
-export function MapaCobertura({ onCobertura }: Props) {
+export function MapaCobertura({ onCobertura, ciudad }: Props) {
     const [busqueda, setBusqueda] = useState('');
     const [sugerencias, setSugerencias] = useState<any[]>([]);
     const [coordsUsuario, setCoordsUsuario] = useState<[number, number] | null>(null);
     const [direccionSel, setDireccionSel] = useState('');
+    const [direccionEditable, setDireccionEditable] = useState('');
     const [buscando, setBuscando] = useState(false);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -132,6 +135,20 @@ export function MapaCobertura({ onCobertura }: Props) {
         });
     }
 
+    function normalizarDireccion(texto: string): string {
+        return texto
+            .replace(/\bcl\.?\b/gi, 'Calle')
+            .replace(/\bcra\.?\b/gi, 'Carrera')
+            .replace(/\bkr\.?\b/gi, 'Carrera')
+            .replace(/\bcr\.?\b/gi, 'Carrera')
+            .replace(/\bdg\.?\b/gi, 'Diagonal')
+            .replace(/\btv\.?\b/gi, 'Transversal')
+            .replace(/\bav\.?\b/gi, 'Avenida')
+            .replace(/#/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
     function buscarDireccion(texto: string) {
         setBusqueda(texto);
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -140,11 +157,25 @@ export function MapaCobertura({ onCobertura }: Props) {
         debounceRef.current = setTimeout(async () => {
             setBuscando(true);
             try {
+                const textoNormalizado = normalizarDireccion(texto);
+                const consulta = ciudad
+                    ? textoNormalizado + ', ' + ciudad + ', Colombia'
+                    : textoNormalizado + ', Colombia';
+
                 const res = await fetch(
-                    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(texto + ', Colombia')}&format=json&limit=5&addressdetails=1`,
+                    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(consulta)}&format=json&limit=5&addressdetails=1&countrycodes=co`,
                     { headers: { 'Accept-Language': 'es' } }
                 );
-                const data = await res.json();
+                let data = await res.json();
+
+                if (data.length === 0 && ciudad) {
+                    const resSinCiudad = await fetch(
+                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(textoNormalizado + ', Colombia')}&format=json&limit=5&addressdetails=1&countrycodes=co`,
+                        { headers: { 'Accept-Language': 'es' } }
+                    );
+                    data = await resSinCiudad.json();
+                }
+
                 setSugerencias(data);
             } catch {
                 setSugerencias([]);
@@ -154,15 +185,52 @@ export function MapaCobertura({ onCobertura }: Props) {
         }, 500);
     }
 
+    function actualizarUbicacion(coords: [number, number], direccion: string) {
+        setCoordsUsuario(coords);
+        setDireccionSel(direccion);
+        setDireccionEditable(direccion);
+        const tiene = dentroDeCobertura(coords);
+        onCobertura(tiene, direccion, coords);
+    }
+
+    function onEditarDireccion(nuevoTexto: string) {
+        setDireccionEditable(nuevoTexto);
+        if (coordsUsuario) {
+            const tiene = dentroDeCobertura(coordsUsuario);
+            onCobertura(tiene, nuevoTexto, coordsUsuario);
+        }
+    }
+
     function seleccionarDireccion(item: any) {
         const coords: [number, number] = [parseFloat(item.lat), parseFloat(item.lon)];
         const direccion = item.display_name.split(',').slice(0, 3).join(',');
-        setCoordsUsuario(coords);
-        setDireccionSel(direccion);
         setBusqueda(direccion);
         setSugerencias([]);
-        const tiene = dentroDeCobertura(coords);
-        onCobertura(tiene, direccion, coords);
+        actualizarUbicacion(coords, direccion);
+    }
+
+    async function onArrastrarPin(e: any) {
+        const marker = e.target;
+        const posicion = marker.getLatLng();
+        const coords: [number, number] = [posicion.lat, posicion.lng];
+
+        setBuscando(true);
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&addressdetails=1`,
+                { headers: { 'Accept-Language': 'es' } }
+            );
+            const data = await res.json();
+            const direccion = data.display_name
+                ? data.display_name.split(',').slice(0, 3).join(',')
+                : 'Ubicacion seleccionada en el mapa';
+            setBusqueda(direccion);
+            actualizarUbicacion(coords, direccion);
+        } catch {
+            actualizarUbicacion(coords, direccionSel);
+        } finally {
+            setBuscando(false);
+        }
     }
 
     const tieneCobertura = coordsUsuario ? dentroDeCobertura(coordsUsuario) : null;
@@ -179,7 +247,7 @@ export function MapaCobertura({ onCobertura }: Props) {
                         type="text"
                         value={busqueda}
                         onChange={(e) => buscarDireccion(e.target.value)}
-                        placeholder="Escribe tu dirección..."
+                        placeholder="Escribe tu barrio o calle (ej: Laureles, Calle 32)..."
                         className="flex-1 outline-none text-sm text-[#051620] placeholder:text-[#aaa] bg-transparent"
                     />
                     {buscando && (
@@ -214,9 +282,9 @@ export function MapaCobertura({ onCobertura }: Props) {
                     style={{ height: '100%', width: '100%' }}
                     zoomControl={true}
                 >
-                    {/* Tile blanco estilo Google Maps */}
+                    {/* Tile con colores tipo Google Maps */}
                     <TileLayer
-                        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
                     />
 
@@ -257,14 +325,37 @@ export function MapaCobertura({ onCobertura }: Props) {
 
                     {/* Pin del usuario */}
                     {coordsUsuario && (
-                        <Marker position={coordsUsuario} icon={iconUsuario}>
-                            <Popup>{direccionSel}</Popup>
+                        <Marker
+                            position={coordsUsuario}
+                            icon={iconUsuario}
+                            draggable={true}
+                            eventHandlers={{ dragend: onArrastrarPin }}
+                        >
+                            <Popup>Arrastra el pin para ajustar tu ubicacion exacta</Popup>
                         </Marker>
                     )}
 
                     <MoverMapa coords={coordsUsuario} />
                 </MapContainer>
             </div>
+
+            {coordsUsuario && (
+                <div>
+                    <label className="text-xs font-medium text-[#051620]/60 uppercase tracking-widest mb-1.5 block">
+                        Confirma tu direccion exacta
+                    </label>
+                    <input
+                        type="text"
+                        value={direccionEditable}
+                        onChange={(e) => onEditarDireccion(e.target.value)}
+                        placeholder="Ej: Carrera 25A #53-20, El Pinal"
+                        className="w-full px-4 py-2.5 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] focus:ring-2 focus:ring-[#051620]/20"
+                    />
+                    <p className="text-xs text-[#999] mt-1.5">
+                        Ajustamos el pin al punto aproximado, corrige aqui el numero exacto de tu casa si hace falta.
+                    </p>
+                </div>
+            )}
 
             {/* Resultado cobertura */}
             {tieneCobertura !== null && (

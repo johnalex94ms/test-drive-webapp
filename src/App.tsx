@@ -5,6 +5,9 @@ import BookingPage from './pages/BookingPage';
 import TrackerPage from './pages/TrackerPage';
 import GestionReservaPage from './pages/GestionReservaPage';
 import LoginAdminPage from './pages/admin/LoginAdminPage';
+import LoginConductorPage from './pages/conductor/LoginConductorPage';
+import ConductorLayout from './pages/conductor/ConductorLayout';
+import ConductorDashboardPage from './pages/conductor/ConductorDashboardPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import ReservasAdminPage from './pages/admin/ReservasAdminPage';
 import CalendarioAdminPage from './pages/admin/CalendarioAdminPage';
@@ -32,6 +35,10 @@ export default function App() {
           <Route path="/reserva/:token" element={<GestionReservaPage />} />
 
           <Route path="/admin/login" element={<LoginAdminPage />} />
+          <Route path="/conductor/login" element={<LoginConductorPage />} />
+          <Route path="/conductor" element={<ConductorLayout />}>
+            <Route index element={<ConductorDashboardPage />} />
+          </Route>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<ReservasAdminPage />} />
             <Route path="calendario" element={<CalendarioAdminPage />} />

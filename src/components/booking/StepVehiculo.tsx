@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useBookingStore } from '../../store/bookingStore';
-import type { Vehiculo } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Vehiculo360 } from './Vehiculo360';
 import { obtenerImagenes360 } from '../../lib/vehiculoImagenes';
@@ -27,18 +26,34 @@ const FOTOS: Record<string, string> = {
     EV2: 'https://www.kia.com/content/dam/kwcms/kce/global/en/assets/contents/utility/find-a-car/carcard/2024-ev2.png',
 };
 
-interface VehiculoConSpecs extends Vehiculo {
+interface VehiculoConSpecs {
+    id: string;
+    modelo: string;
+    categoria: string;
     velocidad_max?: string;
     motor?: string;
     potencia?: string;
     tipo_cambio?: string;
     imagenes_360?: string[];
+    sede_id: string;
+    activo: boolean;
+}
+
+interface ModeloAgrupado {
+    modelo: string;
+    categoria: string;
+    velocidad_max?: string;
+    motor?: string;
+    potencia?: string;
+    tipo_cambio?: string;
+    imagenes_360?: string[];
+    cantidadSedes: number;
 }
 
 export function StepVehiculo() {
-    const { vehiculo, setVehiculo, setPaso } = useBookingStore();
+    const { modelo, setModelo, setPaso } = useBookingStore();
     const [categoriaFiltro, setCategoriaFiltro] = useState('todos');
-    const [hoverId, setHoverId] = useState<string | null>(null);
+    const [hoverModelo, setHoverModelo] = useState<string | null>(null);
 
     const { data: vehiculos = [], isLoading } = useQuery({
         queryKey: ['vehiculos'],
@@ -53,11 +68,33 @@ export function StepVehiculo() {
         },
     });
 
-    const filtrados = categoriaFiltro === 'todos'
-        ? vehiculos
-        : vehiculos.filter((v) => v.categoria === categoriaFiltro);
+    const modelosAgrupados = useMemo(() => {
+        const mapa: Record<string, VehiculoConSpecs[]> = {};
+        vehiculos.forEach((v) => {
+            if (!mapa[v.modelo]) mapa[v.modelo] = [];
+            mapa[v.modelo].push(v);
+        });
 
-    const seleccionado = vehiculos.find((v) => v.id === vehiculo?.id) as VehiculoConSpecs | undefined;
+        return Object.entries(mapa).map(([nombreModelo, unidades]): ModeloAgrupado => {
+            const representante = unidades[0];
+            return {
+                modelo: nombreModelo,
+                categoria: representante.categoria,
+                velocidad_max: representante.velocidad_max,
+                motor: representante.motor,
+                potencia: representante.potencia,
+                tipo_cambio: representante.tipo_cambio,
+                imagenes_360: representante.imagenes_360,
+                cantidadSedes: unidades.length,
+            };
+        }).sort((a, b) => a.modelo.localeCompare(b.modelo));
+    }, [vehiculos]);
+
+    const filtrados = categoriaFiltro === 'todos'
+        ? modelosAgrupados
+        : modelosAgrupados.filter((m) => m.categoria === categoriaFiltro);
+
+    const seleccionado = modelosAgrupados.find((m) => m.modelo === modelo);
 
     return (
         <div className="flex flex-col lg:flex-row gap-8">
@@ -93,24 +130,24 @@ export function StepVehiculo() {
                 {isLoading ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {[...Array(6)].map((_, i) => (
-                            <div key={i} className="h-40 bg-[#e5e5e5] rounded-sm animate-pulse" />
+                            <div key={i} className="h-44 bg-[#e5e5e5] rounded-sm animate-pulse" />
                         ))}
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {filtrados.map((v) => {
-                            const foto = FOTOS[v.modelo];
-                            const imagenesDb = v.imagenes_360 || [];
-                            const imagenesLocal = obtenerImagenes360(v.modelo);
-                            const fotoFinal = imagenesDb.length > 0 ? imagenesDb[0] : (imagenesLocal.length > 0 ? imagenesLocal[0] : foto);
-                            const activo = vehiculo?.id === v.id;
-                            const hover = hoverId === v.id;
+                        {filtrados.map((m) => {
+                            const imagenesLocal = obtenerImagenes360(m.modelo);
+                            const fotoFinal = (m.imagenes_360 && m.imagenes_360.length > 0)
+                                ? m.imagenes_360[0]
+                                : (imagenesLocal.length > 0 ? imagenesLocal[0] : FOTOS[m.modelo]);
+                            const activo = modelo === m.modelo;
+                            const hover = hoverModelo === m.modelo;
                             return (
                                 <div
-                                    key={v.id}
-                                    onClick={() => setVehiculo(v)}
-                                    onMouseEnter={() => setHoverId(v.id)}
-                                    onMouseLeave={() => setHoverId(null)}
+                                    key={m.modelo}
+                                    onClick={() => setModelo(m.modelo)}
+                                    onMouseEnter={() => setHoverModelo(m.modelo)}
+                                    onMouseLeave={() => setHoverModelo(null)}
                                     className={`
                     relative cursor-pointer rounded-sm border transition-all duration-200 overflow-hidden
                     ${activo
@@ -119,12 +156,11 @@ export function StepVehiculo() {
                                         }
                   `}
                                 >
-                                    {/* Imagen */}
                                     <div className={`h-44 flex items-center justify-center p-2 transition-colors ${activo ? 'bg-[#051620]' : 'bg-[#f8f8f8]'}`}>
                                         {fotoFinal ? (
                                             <img
                                                 src={fotoFinal}
-                                                alt={`KIA ${v.modelo}`}
+                                                alt={`KIA ${m.modelo}`}
                                                 className={`h-full w-full object-contain transition-transform duration-300 ${hover || activo ? 'scale-110' : 'scale-100'}`}
                                                 onError={(e) => {
                                                     e.currentTarget.style.display = 'none';
@@ -135,17 +171,15 @@ export function StepVehiculo() {
                                         )}
                                     </div>
 
-                                    {/* Info */}
                                     <div className={`px-3 py-2.5 ${activo ? 'bg-[#051620]' : 'bg-white'}`}>
                                         <p className={`font-display text-base font-bold ${activo ? 'text-white' : 'text-[#051620]'}`}>
-                                            {v.modelo}
+                                            {m.modelo}
                                         </p>
                                         <p className={`text-xs capitalize mt-0.5 ${activo ? 'text-white/50' : 'text-[#666]'}`}>
-                                            {v.categoria}
+                                            {m.categoria}
                                         </p>
                                     </div>
 
-                                    {/* Check seleccionado */}
                                     {activo && (
                                         <div className="absolute top-2 right-2 w-5 h-5 bg-white/10 border border-white/20 rounded-full flex items-center justify-center">
                                             <span className="text-white text-xs">✓</span>
@@ -158,11 +192,10 @@ export function StepVehiculo() {
                 )}
             </div>
 
-            {/* Panel derecho — detalle del vehículo seleccionado */}
+            {/* Panel derecho — detalle del modelo seleccionado */}
             <div className="lg:w-80 lg:sticky lg:top-24 lg:self-start">
                 {seleccionado ? (
                     <div className="bg-[#051620] rounded-sm overflow-hidden">
-                        {/* Foto 360 */}
                         <div className="h-48 bg-[#0a2030] flex items-center justify-center p-6">
                             <Vehiculo360
                                 modelo={seleccionado.modelo}
@@ -172,7 +205,6 @@ export function StepVehiculo() {
                             />
                         </div>
 
-                        {/* Nombre */}
                         <div className="px-5 pt-4 pb-2 border-b border-white/10">
                             <p className="text-white/50 text-xs uppercase tracking-widest">KIA</p>
                             <h3 className="font-display text-2xl font-bold text-white mt-0.5">
@@ -181,7 +213,6 @@ export function StepVehiculo() {
                             <p className="text-white/40 text-xs capitalize mt-0.5">{seleccionado.categoria}</p>
                         </div>
 
-                        {/* Specs */}
                         <div className="px-5 py-4 grid grid-cols-2 gap-3">
                             {[
                                 { label: 'Motor', valor: seleccionado.motor },
@@ -198,7 +229,6 @@ export function StepVehiculo() {
                             ))}
                         </div>
 
-                        {/* CTA */}
                         <div className="px-5 pb-5">
                             <Button
                                 onClick={() => setPaso(2)}
@@ -211,9 +241,9 @@ export function StepVehiculo() {
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-8 text-center">
-                        <div className="text-5xl mb-3 text-[#e5e5e5] font-display font-bold">KIA</div>
-                        <p className="text-[#666] text-sm">
+                    <div className="bg-[#051620] rounded-sm p-10 text-center">
+                        <div className="text-5xl mb-3 text-white/20 font-display font-bold">KIA</div>
+                        <p className="text-white/50 text-sm">
                             Selecciona un vehículo para ver sus características
                         </p>
                     </div>
