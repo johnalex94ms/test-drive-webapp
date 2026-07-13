@@ -15,6 +15,8 @@ const TIPOS_DOCUMENTO = [
   { value: 'PA', label: 'Pasaporte' },
 ];
 
+const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})?$/;
+
 function fotoConductor(nombre: string) {
   let hash = 0;
   for (let i = 0; i < nombre.length; i++) {
@@ -101,6 +103,40 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
     return (h < 10 ? '0' + h : '' + h) + ':00';
   }
 
+  function handleNumeroDocumento(valor: string) {
+    const soloNumeros = valor.replace(/\D/g, '').slice(0, 12);
+    setNumeroDocumento(soloNumeros);
+  }
+
+  function handleCelular(valor: string) {
+    const soloNumeros = valor.replace(/\D/g, '').slice(0, 10);
+    setCelular(soloNumeros);
+  }
+
+  const errorDocumento = intentoEnviar
+    ? (!numeroDocumento
+      ? 'Requerido'
+      : numeroDocumento.length < 6
+        ? 'Minimo 6 numeros'
+        : undefined)
+    : undefined;
+
+  const errorCorreo = intentoEnviar
+    ? (!correo
+      ? 'Requerido'
+      : !REGEX_CORREO.test(correo)
+        ? 'Correo invalido'
+        : undefined)
+    : undefined;
+
+  const errorCelular = intentoEnviar
+    ? (!celular
+      ? 'Requerido'
+      : celular.length !== 10
+        ? 'Debe tener 10 numeros'
+        : undefined)
+    : undefined;
+
   async function confirmar() {
     setIntentoEnviar(true);
 
@@ -110,6 +146,18 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
     }
     if (!nombres || !apellidos || !numeroDocumento || !correo || !celular) {
       setErrorMsg('Faltan campos por completar, revisa los marcados en rojo.');
+      return;
+    }
+    if (numeroDocumento.length < 6 || numeroDocumento.length > 12) {
+      setErrorMsg('El numero de documento debe tener entre 6 y 12 numeros.');
+      return;
+    }
+    if (!REGEX_CORREO.test(correo)) {
+      setErrorMsg('Ingresa un correo electronico valido.');
+      return;
+    }
+    if (celular.length !== 10) {
+      setErrorMsg('El celular debe tener 10 numeros.');
       return;
     }
     if (!aceptaTerminos) {
@@ -323,9 +371,10 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
                 <Input
                   icon={IdCard}
                   placeholder="Numero de documento"
+                  inputMode="numeric"
                   value={numeroDocumento}
-                  onChange={(e) => setNumeroDocumento(e.target.value)}
-                  error={intentoEnviar && !numeroDocumento ? 'Requerido' : undefined}
+                  onChange={(e) => handleNumeroDocumento(e.target.value)}
+                  error={errorDocumento}
                 />
               </div>
 
@@ -335,15 +384,15 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
                 type="email"
                 value={correo}
                 onChange={(e) => setCorreo(e.target.value)}
-                error={intentoEnviar && !correo ? 'Requerido' : undefined}
+                error={errorCorreo}
               />
               <Input
                 icon={Phone}
                 placeholder="Celular"
-                type="tel"
+                inputMode="numeric"
                 value={celular}
-                onChange={(e) => setCelular(e.target.value)}
-                error={intentoEnviar && !celular ? 'Requerido' : undefined}
+                onChange={(e) => handleCelular(e.target.value)}
+                error={errorCelular}
               />
 
               <div className="relative">

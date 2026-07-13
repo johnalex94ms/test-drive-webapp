@@ -12,6 +12,7 @@ const CATEGORIAS = [
 ];
 
 const PORPAGINA = 10;
+const REGEX_PLACA = /^[A-Z]{3}-\d{3}$/;
 
 interface VehiculoForm {
     id?: string;
@@ -93,6 +94,14 @@ export default function VehiculosAdminPage() {
     useEffect(() => {
         setPagina(1);
     }, [busqueda, sedeFiltro, categoriaFiltro, estadoFiltro]);
+
+    function handlePlaca(valor: string) {
+        const limpio = valor.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+        const letras = limpio.slice(0, 3).replace(/[0-9]/g, '');
+        const numeros = limpio.slice(3).replace(/[^0-9]/g, '');
+        const formateada = numeros ? letras + '-' + numeros : letras;
+        setForm((f) => ({ ...f, placa: formateada }));
+    }
 
     function abrirNuevo() {
         setForm(formVacio(sedes[0]?.id || ''));
@@ -183,6 +192,11 @@ export default function VehiculosAdminPage() {
     async function guardar() {
         if (!form.modelo.trim() || !form.placa.trim() || !form.sede_id) {
             setErrorMsg('Modelo, placa y sede son obligatorios.');
+            return;
+        }
+
+        if (!REGEX_PLACA.test(form.placa.trim().toUpperCase())) {
+            setErrorMsg('La placa debe tener el formato XYZ-123 (3 letras, guion, 3 numeros).');
             return;
         }
 
@@ -505,12 +519,14 @@ export default function VehiculosAdminPage() {
                                     placeholder="Modelo (ej. Sportage)"
                                     value={form.modelo}
                                     onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+                                    maxLength={20}
                                 />
                                 <Input
                                     type="text"
-                                    placeholder="Placa"
+                                    placeholder="Placa (ej. ABC-123)"
                                     value={form.placa}
-                                    onChange={(e) => setForm({ ...form, placa: e.target.value })}
+                                    onChange={(e) => handlePlaca(e.target.value)}
+                                    maxLength={7}
                                 />
                             </div>
 
@@ -534,12 +550,14 @@ export default function VehiculosAdminPage() {
                                     placeholder="Motor (ej. 1.6T)"
                                     value={form.motor}
                                     onChange={(e) => setForm({ ...form, motor: e.target.value })}
+                                    maxLength={20}
                                 />
                                 <Input
                                     type="text"
                                     placeholder="Potencia (ej. 180 hp)"
                                     value={form.potencia}
                                     onChange={(e) => setForm({ ...form, potencia: e.target.value })}
+                                    maxLength={20}
                                 />
                             </div>
 
@@ -549,12 +567,14 @@ export default function VehiculosAdminPage() {
                                     placeholder="Vel. maxima (ej. 200 km/h)"
                                     value={form.velocidad_max}
                                     onChange={(e) => setForm({ ...form, velocidad_max: e.target.value })}
+                                    maxLength={20}
                                 />
                                 <Input
                                     type="text"
                                     placeholder="Cambios (ej. Automatico)"
                                     value={form.tipo_cambio}
                                     onChange={(e) => setForm({ ...form, tipo_cambio: e.target.value })}
+                                    maxLength={20}
                                 />
                             </div>
 

@@ -185,8 +185,8 @@ export default function AdminLayout() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f8f8f8] flex">
-            <aside className="w-56 bg-[#051620] flex flex-col justify-between py-6">
+        <div className="h-screen bg-[#f8f8f8] flex overflow-hidden">
+            <aside className="w-56 bg-[#051620] flex flex-col justify-between py-6 h-full flex-shrink-0 overflow-y-auto">
                 <div>
                     <Link to="/admin" className="px-5 mb-8 block hover:opacity-80 transition-opacity">
                         <img src={logoDistrikia} alt="Distrikia" className="h-5 mb-2" />
@@ -231,7 +231,7 @@ export default function AdminLayout() {
                         </button>
                     )}
                     {permiso === 'granted' && (
-                        <p className="flex items-center gap-2 text-xs text-white/40">
+                        <p className="flex items-center justify-center gap-2 text-xs text-white/40">
                             <Bell className="w-3.5 h-3.5" />
                             Notificaciones activas
                         </p>
@@ -260,7 +260,7 @@ export default function AdminLayout() {
                 </div>
             </aside>
 
-            <main className="flex-1 p-8">
+            <main className="flex-1 h-full overflow-y-auto p-8">
                 <Outlet />
             </main>
 

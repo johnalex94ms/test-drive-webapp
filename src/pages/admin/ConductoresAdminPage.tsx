@@ -7,6 +7,7 @@ import { FotoCropModal } from '../../components/admin/FotoCropModal';
 import { Input } from '../../components/ui/Input';
 
 const PORPAGINA = 10;
+const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})?$/;
 
 interface ConductorForm {
     id?: string;
@@ -160,6 +161,11 @@ export default function ConductoresAdminPage() {
     async function guardar() {
         if (!form.nombre.trim() || !form.correo.trim()) {
             setErrorMsg('Nombre y correo son obligatorios.');
+            return;
+        }
+
+        if (!REGEX_CORREO.test(form.correo.trim())) {
+            setErrorMsg('Ingresa un correo electronico valido.');
             return;
         }
 
@@ -553,6 +559,7 @@ export default function ConductoresAdminPage() {
                                 placeholder="Nombre completo"
                                 value={form.nombre}
                                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                                maxLength={50}
                             />
                             <Input
                                 type="email"
@@ -565,6 +572,7 @@ export default function ConductoresAdminPage() {
                                 placeholder="Cargo (ej. Experto de producto KIA)"
                                 value={form.cargo}
                                 onChange={(e) => setForm({ ...form, cargo: e.target.value })}
+                                maxLength={50}
                             />
 
                             <label className="flex items-center gap-2 cursor-pointer">
