@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, Search, ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet } from 'lucide-react';
+import { Pencil, Trash2, Search, ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, KeyRound } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { supabase } from '../../lib/supabaseClient';
 import { FotoCropModal } from '../../components/admin/FotoCropModal';
@@ -40,6 +40,9 @@ export default function ConductoresAdminPage() {
     const [sedeFiltro, setSedeFiltro] = useState('todas');
     const [estadoFiltro, setEstadoFiltro] = useState('todos');
     const [pagina, setPagina] = useState(1);
+    const [conductorAResetear, setConductorAResetear] = useState<any>(null);
+    const [reseteando, setReseteando] = useState(false);
+    const [resetExitoso, setResetExitoso] = useState(false);
 
     const sedesQuery = useQuery({
         queryKey: ['admin-sedes-lista'],
@@ -232,6 +235,42 @@ export default function ConductoresAdminPage() {
         }
     }
 
+    async function resetearClave() {
+        if (!conductorAResetear) return;
+        setReseteando(true);
+        setErrorMsg(null);
+
+        try {
+            const sesionActual = await supabase.auth.getSession();
+            const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/crear-conductor', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + sesionActual.data.session?.access_token,
+                },
+                body: JSON.stringify({
+                    conductorId: conductorAResetear.id,
+                    nombre: conductorAResetear.nombre,
+                    correo: conductorAResetear.correo,
+                    authUserId: conductorAResetear.auth_user_id,
+                }),
+            });
+
+            if (!res.ok) throw new Error('fallo');
+
+            setResetExitoso(true);
+            queryClient.invalidateQueries({ queryKey: ['admin-conductores'] });
+            setTimeout(() => {
+                setConductorAResetear(null);
+                setResetExitoso(false);
+            }, 2500);
+        } catch {
+            setErrorMsg('No se pudo restablecer la contraseña, intenta de nuevo.');
+        } finally {
+            setReseteando(false);
+        }
+    }
+
     async function exportarExcel() {
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Distrikia';
@@ -415,6 +454,14 @@ export default function ConductoresAdminPage() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => setConductorAResetear(c)}
+                                                title="Restablecer contraseña"
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                            >
+                                                <KeyRound className="w-3.5 h-3.5" />
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => abrirEditar(c)}
@@ -607,6 +654,50 @@ export default function ConductoresAdminPage() {
                                 {guardando ? 'Eliminando...' : 'Si, eliminar'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal restablecer contraseña */}
+            {conductorAResetear && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
+                        <p className="font-display text-lg font-bold text-[#051620] mb-2">
+                            Restablecer contraseña de {conductorAResetear.nombre}?
+                        </p>
+                        <p className="text-sm text-[#666] mb-6">
+                            Se generara una nueva contraseña temporal y se le enviara por correo. Debera cambiarla al ingresar de nuevo.
+                        </p>
+                        {resetExitoso ? (
+                            <p className="text-sm text-green-700 bg-green-50 border border-green-100 rounded-sm px-4 py-3">
+                                Contraseña restablecida y correo enviado.
+                            </p>
+                        ) : (
+                            <>
+                                {errorMsg && (
+                                    <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3 mb-4">
+                                        {errorMsg}
+                                    </p>
+                                )}
+                                <div className="flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setConductorAResetear(null); setErrorMsg(null); }}
+                                        className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={reseteando}
+                                        onClick={resetearClave}
+                                        className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                                    >
+                                        {reseteando ? 'Restableciendo...' : 'Si, restablecer'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
