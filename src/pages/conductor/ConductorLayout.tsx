@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { LogOut, KeyRound, X, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useConductorStore } from '../../store/conductorStore';
+import loadingGif from '../../assets/images/loading/loading_coche.gif';
 
 export default function ConductorLayout() {
     const navigate = useNavigate();
@@ -93,8 +94,9 @@ export default function ConductorLayout() {
 
     if (cargando) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#f8f8f8]">
-                <p className="text-[#666] text-sm">Cargando...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center gap-2 bg-[#FFFFFF]">
+                <img src={loadingGif} alt="Cargando" className="w-24 h-24 object-contain" />
+                <p className="text-[#000000] text-md">Cargando...</p>
             </div>
         );
     }

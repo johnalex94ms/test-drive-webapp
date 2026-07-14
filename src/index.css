@@ -49,3 +49,7 @@
 .animate-fade-rotate {
   animation: fadeRotate 350ms ease-out;
 }
+
+html {
+  scroll-behavior: smooth;
+}

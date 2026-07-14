@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Phone } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import loadingGif from '../assets/images/loading/loading_coche.gif';
 
 function fotoConductor(nombre: string) {
     let hash = 0;
@@ -61,8 +62,9 @@ export default function TrackerPage() {
 
     if (reservaQuery.isLoading) {
         return (
-            <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
-                <p className="text-[#666] text-sm">Cargando tu reserva...</p>
+            <div className="min-h-screen bg-[#FFFFFF] flex flex-col items-center justify-center gap-3">
+                <img src={loadingGif} alt="Cargando" className="w-24 h-24 object-contain" />
+                <p className="text-[#000000] text-md">Cargando tu reserva...</p>
             </div>
         );
     }

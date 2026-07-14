@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { User, Mail, Phone, IdCard, MessageSquare, Upload } from 'lucide-react';
+import { User, Mail, Phone, IdCard, MessageSquare, Upload, X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { asignarConductorDisponible } from '../../lib/asignarConductor';
 import { Button } from '../ui/Button';
@@ -236,9 +236,9 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
           <button
             type="button"
             onClick={onClose}
-            className="text-[#666] hover:text-[#051620] text-xl cursor-pointer"
+            className="text-[#666] hover:text-[#051620] cursor-pointer"
           >
-            X
+            <X className="w-5 h-5" />
           </button>
         </div>
 

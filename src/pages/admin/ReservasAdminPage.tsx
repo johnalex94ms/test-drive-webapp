@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink, X } from 'lucide-react';
 
 const SITE_URL = 'http://localhost:5173';
 
@@ -251,9 +251,9 @@ export default function ReservasAdminPage() {
                             <button
                                 type="button"
                                 onClick={() => setSeleccionada(null)}
-                                className="text-[#666] hover:text-[#051620] text-xl cursor-pointer"
+                                className="text-[#666] hover:text-[#051620] cursor-pointer"
                             >
-                                X
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
 
@@ -570,9 +570,9 @@ export default function ReservasAdminPage() {
                     <button
                         type="button"
                         onClick={() => setLicenciaAmpliada(false)}
-                        className="absolute top-6 right-6 text-white text-2xl cursor-pointer"
+                        className="absolute top-6 right-6 text-white cursor-pointer"
                     >
-                        X
+                        <X className="w-6 h-6" />
                     </button>
                     <button
                         type="button"

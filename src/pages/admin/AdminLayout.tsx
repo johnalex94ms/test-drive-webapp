@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
 import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
+import loadingGif from '../../assets/images/loading/loading_coche.gif';
 
 const LINKS = [
     { to: '/admin', label: 'Reservas', icon: ClipboardList },
@@ -178,8 +179,9 @@ export default function AdminLayout() {
 
     if (cargando) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#f8f8f8]">
-                <p className="text-[#666] text-sm">Cargando...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center gap-2 bg-[#FFFFFF]">
+                <img src={loadingGif} alt="Cargando" className="w-24 h-24 object-contain" />
+                <p className="text-[#000000] text-md">Cargando...</p>
             </div>
         );
     }
