@@ -4,8 +4,7 @@ import ExcelJS from 'exceljs';
 import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
-
-const HORARIOS_BASE = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+import { obtenerHorariosDelDia } from '../../lib/horarios';
 
 const ESTILO_ESTADO: Record<string, { bg: string; texto: string; label: string }> = {
     pendiente: { bg: '#fdf3d9', texto: '#8a6d00', label: 'Pendiente' },
@@ -130,12 +129,13 @@ export default function CalendarioAdminPage() {
         workbook.creator = 'Distrikia';
         workbook.created = new Date();
 
+        const horariosExcel = obtenerHorariosDelDia(fecha);
         const hoja = workbook.addWorksheet('Calendario ' + fecha);
         hoja.columns = [
             { header: 'Vehiculo', key: 'vehiculo', width: 22 },
             { header: 'Placa', key: 'placa', width: 12 },
             { header: 'Sede', key: 'sede', width: 20 },
-            ...HORARIOS_BASE.map((h) => ({ header: h, key: h, width: 26 })),
+            ...horariosExcel.map((h) => ({ header: h, key: h, width: 26 })),
         ];
 
         const encabezado = hoja.getRow(1);
@@ -149,7 +149,7 @@ export default function CalendarioAdminPage() {
                 sede: v.sedes ? v.sedes.nombre : '',
             };
 
-            HORARIOS_BASE.forEach((h) => {
+            horariosExcel.forEach((h) => {
                 const reserva = buscarReserva(v.id, h);
                 if (reserva) {
                     const estado = ESTILO_ESTADO[reserva.estado]?.label || reserva.estado;
@@ -322,7 +322,7 @@ export default function CalendarioAdminPage() {
                                 <th className="sticky left-0 bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide px-4 py-3 border-b border-[#e5e5e5] min-w-[160px]">
                                     Vehiculo
                                 </th>
-                                {HORARIOS_BASE.map((h) => (
+                                {obtenerHorariosDelDia(fecha).map((h) => (
                                     <th key={h} className="text-center text-xs text-[#666] uppercase tracking-wide px-2 py-3 border-b border-l border-[#e5e5e5] min-w-[110px]">
                                         {h}
                                     </th>
@@ -336,7 +336,7 @@ export default function CalendarioAdminPage() {
                                         <p className="font-medium text-[#051620] text-sm">KIA {v.modelo}</p>
                                         <p className="text-xs text-[#999]">{v.placa} · {v.sedes ? v.sedes.nombre : ''}</p>
                                     </td>
-                                    {HORARIOS_BASE.map((h) => {
+                                    {obtenerHorariosDelDia(fecha).map((h) => {
                                         const reserva = buscarReserva(v.id, h);
                                         const estilo = reserva ? ESTILO_ESTADO[reserva.estado] : null;
                                         return (

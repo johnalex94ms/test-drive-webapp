@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { supabase } from '../../lib/supabaseClient';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -66,7 +67,6 @@ const COLOMBIA_CENTER: [number, number] = [6.2442, -75.5812];
 
 interface Props {
     onCobertura: (tiene: boolean, direccion: string, coords: [number, number]) => void;
-    ciudad?: string;
 }
 
 function MoverMapa({ coords }: { coords: [number, number] | null }) {
@@ -100,7 +100,7 @@ const iconSede = L.divIcon({
     iconAnchor: [6, 6],
 });
 
-export function MapaCobertura({ onCobertura, ciudad }: Props) {
+export function MapaCobertura({ onCobertura }: Props) {
     const [busqueda, setBusqueda] = useState('');
     const [sugerencias, setSugerencias] = useState<any[]>([]);
     const [coordsUsuario, setCoordsUsuario] = useState<[number, number] | null>(null);
@@ -135,54 +135,26 @@ export function MapaCobertura({ onCobertura, ciudad }: Props) {
         });
     }
 
-    function normalizarDireccion(texto: string): string {
-        return texto
-            .replace(/\bcl\.?\b/gi, 'Calle')
-            .replace(/\bcra\.?\b/gi, 'Carrera')
-            .replace(/\bkr\.?\b/gi, 'Carrera')
-            .replace(/\bcr\.?\b/gi, 'Carrera')
-            .replace(/\bdg\.?\b/gi, 'Diagonal')
-            .replace(/\btv\.?\b/gi, 'Transversal')
-            .replace(/\bav\.?\b/gi, 'Avenida')
-            .replace(/#/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
     function buscarDireccion(texto: string) {
         setBusqueda(texto);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (texto.length < 4) { setSugerencias([]); return; }
+        if (texto.length < 2) { setSugerencias([]); return; }
 
         debounceRef.current = setTimeout(async () => {
             setBuscando(true);
             try {
-                const textoNormalizado = normalizarDireccion(texto);
-                const consulta = ciudad
-                    ? textoNormalizado + ', ' + ciudad + ', Colombia'
-                    : textoNormalizado + ', Colombia';
-
-                const res = await fetch(
-                    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(consulta)}&format=json&limit=5&addressdetails=1&countrycodes=co`,
-                    { headers: { 'Accept-Language': 'es' } }
-                );
-                let data = await res.json();
-
-                if (data.length === 0 && ciudad) {
-                    const resSinCiudad = await fetch(
-                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(textoNormalizado + ', Colombia')}&format=json&limit=5&addressdetails=1&countrycodes=co`,
-                        { headers: { 'Accept-Language': 'es' } }
-                    );
-                    data = await resSinCiudad.json();
-                }
-
-                setSugerencias(data);
+                const res = await supabase
+                    .from('barrios_cobertura')
+                    .select('*')
+                    .ilike('nombre', '%' + texto + '%')
+                    .limit(8);
+                setSugerencias(res.data || []);
             } catch {
                 setSugerencias([]);
             } finally {
                 setBuscando(false);
             }
-        }, 500);
+        }, 300);
     }
 
     function actualizarUbicacion(coords: [number, number], direccion: string) {
@@ -202,8 +174,8 @@ export function MapaCobertura({ onCobertura, ciudad }: Props) {
     }
 
     function seleccionarDireccion(item: any) {
-        const coords: [number, number] = [parseFloat(item.lat), parseFloat(item.lon)];
-        const direccion = item.display_name.split(',').slice(0, 3).join(',');
+        const coords: [number, number] = [Number(item.latitud), Number(item.longitud)];
+        const direccion = item.nombre + ', ' + item.municipio;
         setBusqueda(direccion);
         setSugerencias([]);
         actualizarUbicacion(coords, direccion);
@@ -247,7 +219,7 @@ export function MapaCobertura({ onCobertura, ciudad }: Props) {
                         type="text"
                         value={busqueda}
                         onChange={(e) => buscarDireccion(e.target.value)}
-                        placeholder="Escribe tu barrio o calle (ej: Laureles, Calle 32)..."
+                        placeholder="Escribe tu barrio (ej: Laureles, Belén, El Poblado)..."
                         className="flex-1 outline-none text-sm text-[#051620] placeholder:text-[#aaa] bg-transparent"
                     />
                     {buscando && (
@@ -258,16 +230,14 @@ export function MapaCobertura({ onCobertura, ciudad }: Props) {
                 {/* Sugerencias */}
                 {sugerencias.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-[9999] bg-white border border-[#e5e5e5] rounded-sm shadow-lg mt-1 overflow-hidden">
-                        {sugerencias.map((s, i) => (
+                        {sugerencias.map((s) => (
                             <button
-                                key={i}
+                                key={s.id}
                                 onClick={() => seleccionarDireccion(s)}
                                 className="w-full text-left px-4 py-3 text-sm text-[#051620] hover:bg-[#f8f8f8] border-b border-[#e5e5e5] last:border-0 cursor-pointer transition-colors"
                             >
-                                <p className="font-medium">{s.display_name.split(',')[0]}</p>
-                                <p className="text-xs text-[#666] mt-0.5">
-                                    {s.display_name.split(',').slice(1, 3).join(',')}
-                                </p>
+                                <p className="font-medium">{s.nombre}</p>
+                                <p className="text-xs text-[#666] mt-0.5">Comuna {s.comuna} · {s.municipio}</p>
                             </button>
                         ))}
                     </div>

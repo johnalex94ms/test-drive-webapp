@@ -8,8 +8,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../styles/booking-calendar.css';
 import { supabase } from '../lib/supabaseClient';
 import { asignarConductorDisponible } from '../lib/asignarConductor';
-
-const HORARIOS_BASE = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+import { obtenerHorariosDelDia } from '../lib/horarios';
 
 const localizer = dateFnsLocalizer({
     format,
@@ -90,11 +89,14 @@ export default function GestionReservaPage() {
 
     const diasCompletos: Record<string, boolean> = {};
     Object.keys(ocupadosPorDia).forEach((dia) => {
-        if (ocupadosPorDia[dia].length >= HORARIOS_BASE.length) diasCompletos[dia] = true;
+        const horariosEseDia = obtenerHorariosDelDia(dia);
+        if (horariosEseDia.length > 0 && ocupadosPorDia[dia].length >= horariosEseDia.length) {
+            diasCompletos[dia] = true;
+        }
     });
 
     const disponiblesDia = diaSel
-        ? HORARIOS_BASE.filter((h) => !(ocupadosPorDia[diaSel] || []).includes(h))
+        ? obtenerHorariosDelDia(diaSel).filter((h) => !(ocupadosPorDia[diaSel] || []).includes(h))
         : [];
 
     function dayPropGetter(date: Date) {

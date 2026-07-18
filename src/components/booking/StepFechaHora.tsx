@@ -8,8 +8,7 @@ import '../../styles/booking-calendar.css';
 import { supabase } from '../../lib/supabaseClient';
 import { useBookingStore } from '../../store/bookingStore';
 import { ReservaModal } from './ReservaModal';
-
-const HORARIOS_BASE = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+import { obtenerHorariosDelDia } from '../../lib/horarios';
 
 const localizer = dateFnsLocalizer({
     format,
@@ -109,7 +108,10 @@ export function StepFechaHora() {
 
     const diasCompletos: Record<string, boolean> = {};
     Object.keys(ocupadosPorDia).forEach((dia) => {
-        if (ocupadosPorDia[dia].length >= HORARIOS_BASE.length) diasCompletos[dia] = true;
+        const horariosEseDia = obtenerHorariosDelDia(dia);
+        if (horariosEseDia.length > 0 && ocupadosPorDia[dia].length >= horariosEseDia.length) {
+            diasCompletos[dia] = true;
+        }
     });
 
     const eventos = reservas.map((r: any) => {

@@ -5,8 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { asignarConductorDisponible } from '../../lib/asignarConductor';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-
-const HORARIOS_BASE = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+import { obtenerHorariosDelDia } from '../../lib/horarios';
 
 const TIPOS_DOCUMENTO = [
   { value: 'CC', label: 'Cedula de ciudadania' },
@@ -83,7 +82,8 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
   });
 
   const ocupados = ocupadosQuery.data || [];
-  const disponibles = HORARIOS_BASE.filter((h) => !ocupados.includes(h + ':00'));
+  const horariosDelDia = obtenerHorariosDelDia(fecha);
+  const disponibles = horariosDelDia.filter((h) => !ocupados.includes(h + ':00'));
 
   const sede = sedeQuery.data;
   const ciudad = (zona && zona.municipio) || (sede && sede.ciudad) || '';
