@@ -18,6 +18,7 @@ interface VehiculoForm {
     id?: string;
     sede_id: string;
     modelo: string;
+    version: string;
     placa: string;
     categoria: string;
     motor: string;
@@ -32,6 +33,7 @@ function formVacio(sedeDefault: string): VehiculoForm {
     return {
         sede_id: sedeDefault,
         modelo: '',
+        version: '',
         placa: '',
         categoria: 'automovil',
         motor: '',
@@ -95,6 +97,14 @@ export default function VehiculosAdminPage() {
         setPagina(1);
     }, [busqueda, sedeFiltro, categoriaFiltro, estadoFiltro]);
 
+    const versionesSugeridas = Array.from(
+        new Set(
+            vehiculosBase
+                .filter((v: any) => v.modelo.trim().toLowerCase() === form.modelo.trim().toLowerCase() && v.version)
+                .map((v: any) => v.version as string)
+        )
+    );
+
     function handlePlaca(valor: string) {
         const limpio = valor.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
         const letras = limpio.slice(0, 3).replace(/[0-9]/g, '');
@@ -114,6 +124,7 @@ export default function VehiculosAdminPage() {
             id: v.id,
             sede_id: v.sede_id,
             modelo: v.modelo,
+            version: v.version || '',
             placa: v.placa,
             categoria: v.categoria || 'automovil',
             motor: v.motor || '',
@@ -131,6 +142,7 @@ export default function VehiculosAdminPage() {
         setForm({
             sede_id: v.sede_id,
             modelo: v.modelo,
+            version: v.version || '',
             placa: '',
             categoria: v.categoria || 'automovil',
             motor: v.motor || '',
@@ -207,6 +219,7 @@ export default function VehiculosAdminPage() {
             const payload = {
                 sede_id: form.sede_id,
                 modelo: form.modelo.trim(),
+                version: form.version.trim() || null,
                 placa: form.placa.trim().toUpperCase(),
                 categoria: form.categoria,
                 motor: form.motor || null,
@@ -365,6 +378,7 @@ export default function VehiculosAdminPage() {
                             <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
                                 <tr>
                                     <th className="px-4 py-3">Modelo</th>
+                                    <th className="px-4 py-3">Version</th>
                                     <th className="px-4 py-3">Placa</th>
                                     <th className="px-4 py-3">Categoria</th>
                                     <th className="px-4 py-3">Sede</th>
@@ -377,6 +391,7 @@ export default function VehiculosAdminPage() {
                                 {vehiculosPagina.map((v: any) => (
                                     <tr key={v.id} className="border-t border-[#e5e5e5]">
                                         <td className="px-4 py-3 font-medium text-[#051620]">KIA {v.modelo}</td>
+                                        <td className="px-4 py-3 text-[#666]">{v.version || '—'}</td>
                                         <td className="px-4 py-3 text-[#666]">{v.placa}</td>
                                         <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
                                         <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
@@ -528,6 +543,32 @@ export default function VehiculosAdminPage() {
                                     onChange={(e) => handlePlaca(e.target.value)}
                                     maxLength={7}
                                 />
+                            </div>
+
+                            <div>
+                                <Input
+                                    type="text"
+                                    placeholder="Version (ej. Zenith AT)"
+                                    value={form.version}
+                                    onChange={(e) => setForm({ ...form, version: e.target.value })}
+                                    maxLength={40}
+                                    list="versiones-sugeridas"
+                                    className="pr-9 bg-no-repeat"
+                                    style={{
+                                        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                                        backgroundPosition: 'right 14px center',
+                                    }}
+                                />
+                                <datalist id="versiones-sugeridas">
+                                    {versionesSugeridas.map((v) => (
+                                        <option key={v} value={v} />
+                                    ))}
+                                </datalist>
+                                {versionesSugeridas.length > 0 && (
+                                    <p className="text-xs text-[#999] mt-1">
+                                        Versiones ya usadas para {form.modelo}: {versionesSugeridas.join(', ')}
+                                    </p>
+                                )}
                             </div>
 
                             <select
