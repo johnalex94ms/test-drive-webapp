@@ -5,6 +5,7 @@ import { useBookingStore } from '../../store/bookingStore';
 import { Button } from '../ui/Button';
 import { Vehiculo360 } from './Vehiculo360';
 import { obtenerImagenes360 } from '../../lib/vehiculoImagenes';
+import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
 
 const CATEGORIAS = [
     { key: 'todos', label: 'Todos' },
@@ -167,7 +168,7 @@ export function StepVehiculo() {
                                                 }}
                                             />
                                         ) : (
-                                            <span className="font-display text-3xl font-bold text-[#e5e5e5]">KIA</span>
+                                            <img src={logoDistrikia} alt="Distrikia" className="h-10 opacity-30" />
                                         )}
                                     </div>
 
@@ -242,7 +243,7 @@ export function StepVehiculo() {
                     </div>
                 ) : (
                     <div className="bg-[#051620] rounded-sm p-10 text-center">
-                        <div className="text-5xl mb-3 text-white/20 font-display font-bold">KIA</div>
+                        <img src={logoDistrikia} alt="Distrikia" className="h-8 mx-auto mb-4 opacity-70" />
                         <p className="text-white/50 text-sm">
                             Selecciona un vehículo para ver sus características
                         </p>
