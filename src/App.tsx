@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import LandingPage from './pages/LandingPage';
 import BookingPage from './pages/BookingPage';
 import TrackerPage from './pages/TrackerPage';
 import GestionReservaPage from './pages/GestionReservaPage';
@@ -29,7 +28,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<BookingPage />} />
           <Route path="/agendar" element={<BookingPage />} />
           <Route path="/tracker/:id" element={<TrackerPage />} />
           <Route path="/reserva/:token" element={<GestionReservaPage />} />

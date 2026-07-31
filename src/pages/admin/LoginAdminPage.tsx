@@ -51,7 +51,7 @@ export default function LoginAdminPage() {
             {/* Video izquierda */}
             <div className="hidden lg:block lg:w-1/2 relative overflow-hidden bg-[#051620]">
                 <iframe
-                    src="https://www.youtube.com/embed/opJESXTrTCs?autoplay=1&mute=1&loop=1&playlist=opJESXTrTCs&controls=0&showinfo=0&rel=0&modestbranding=1"
+                    src="https://www.youtube.com/embed/W8uvUaGFPbY?autoplay=1&mute=1&loop=1&playlist=W8uvUaGFPbY&controls=0&showinfo=0&rel=0&modestbranding=1"
                     title="Distrikia KIA"
                     allow="autoplay; encrypted-media"
                     className="absolute w-[177.78vh] h-[56.25vw] min-w-full min-h-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
