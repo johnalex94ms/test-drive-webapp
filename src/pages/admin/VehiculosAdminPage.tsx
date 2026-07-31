@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight, RotateCcw, Car, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
+import { DIAS_SEMANA_PICO_PLACA, diasBloqueadosPorPlaca, digitosDelDia, type DiaPicoPlaca } from '../../lib/picoPlaca';
+import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
 
 const CATEGORIAS = [
     { value: 'automovil', label: 'Automovil' },
@@ -13,6 +15,11 @@ const CATEGORIAS = [
 
 const PORPAGINA = 10;
 const REGEX_PLACA = /^[A-Z]{3}-\d{3}$/;
+
+// Ajusta aqui el color/intensidad del sombreado de pico y placa (r, g, b, alpha 0-1)
+const COLOR_SOMBREADO_PICO_PLACA = 'rgba(240, 138, 138, 0.1)';
+// Sombreado para vehiculos que ya cumplieron su vida util y estan listos para vender
+const COLOR_SOMBREADO_LISTO_VENTA = 'rgba(220, 38, 38, 0.08)';
 
 interface VehiculoForm {
     id?: string;
@@ -27,6 +34,7 @@ interface VehiculoForm {
     tipo_cambio: string;
     activo: boolean;
     imagenes: string[];
+    fechaIngreso: string;
 }
 
 function formVacio(sedeDefault: string): VehiculoForm {
@@ -42,6 +50,7 @@ function formVacio(sedeDefault: string): VehiculoForm {
         tipo_cambio: '',
         activo: true,
         imagenes: [],
+        fechaIngreso: new Date().toISOString().slice(0, 10),
     };
 }
 
@@ -75,8 +84,18 @@ export default function VehiculosAdminPage() {
         },
     });
 
+    const picoPlacaConfigQuery = useQuery({
+        queryKey: ['pico-placa-config'],
+        queryFn: async () => {
+            const res = await supabase.from('pico_placa_config').select('*').order('dia_semana');
+            return (res.data || []) as DiaPicoPlaca[];
+        },
+    });
+
     const sedes = sedesQuery.data || [];
     const vehiculosBase = vehiculosQuery.data || [];
+    const picoPlacaConfig = picoPlacaConfigQuery.data || [];
+    const digitosHoy = digitosDelDia(new Date().getDay(), picoPlacaConfig);
 
     const vehiculos = vehiculosBase.filter((v: any) => {
         const coincideTexto = busqueda.trim() === '' ||
@@ -133,6 +152,7 @@ export default function VehiculosAdminPage() {
             tipo_cambio: v.tipo_cambio || '',
             activo: v.activo,
             imagenes: v.imagenes_360 || [],
+            fechaIngreso: v.fecha_ingreso || new Date().toISOString().slice(0, 10),
         });
         setErrorMsg(null);
         setModalAbierto(true);
@@ -151,6 +171,7 @@ export default function VehiculosAdminPage() {
             tipo_cambio: v.tipo_cambio || '',
             activo: true,
             imagenes: v.imagenes_360 || [],
+            fechaIngreso: new Date().toISOString().slice(0, 10),
         });
         setErrorMsg(null);
         setModalAbierto(true);
@@ -228,6 +249,7 @@ export default function VehiculosAdminPage() {
                 tipo_cambio: form.tipo_cambio || null,
                 activo: form.activo,
                 imagenes_360: form.imagenes,
+                fecha_ingreso: form.fechaIngreso,
             };
 
             if (form.id) {
@@ -269,13 +291,21 @@ export default function VehiculosAdminPage() {
                     <h1 className="font-display text-2xl font-bold text-[#051620]">Vehiculos</h1>
                     <p className="text-sm text-[#666]">Gestiona el catalogo de vehiculos disponibles para prueba.</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={abrirNuevo}
-                    className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
-                >
-                    + Nuevo vehiculo
-                </button>
+                <div className="flex items-center gap-3">
+                    {digitosHoy.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-800 text-sm font-semibold px-3 py-3 rounded-sm whitespace-nowrap">
+                            <Car className="w-5 h-5" />
+                            Pico y Placa hoy: {digitosHoy.join(', ')}
+                        </span>
+                    )}
+                    <button
+                        type="button"
+                        onClick={abrirNuevo}
+                        className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
+                    >
+                        + Nuevo vehiculo
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6 flex items-end gap-3 flex-wrap">
@@ -383,53 +413,90 @@ export default function VehiculosAdminPage() {
                                     <th className="px-4 py-3">Categoria</th>
                                     <th className="px-4 py-3">Sede</th>
                                     <th className="px-4 py-3">Fotos</th>
+                                    <th className="px-4 py-3">Ingreso</th>
+                                    <th className="px-4 py-3">Pico y placa</th>
                                     <th className="px-4 py-3">Estado</th>
                                     <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {vehiculosPagina.map((v: any) => (
-                                    <tr key={v.id} className="border-t border-[#e5e5e5]">
-                                        <td className="px-4 py-3 font-medium text-[#051620]">KIA {v.modelo}</td>
-                                        <td className="px-4 py-3 text-[#666]">{v.version || '—'}</td>
-                                        <td className="px-4 py-3 text-[#666]">{v.placa}</td>
-                                        <td className="px-4 py-3 text-[#666] capitalize">{v.categoria}</td>
-                                        <td className="px-4 py-3 text-[#666]">{v.sedes ? v.sedes.nombre : '—'}</td>
-                                        <td className="px-4 py-3 text-[#666]">
-                                            {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
-                                                {v.activo ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                                            <button
-                                                type="button"
-                                                onClick={() => duplicarVehiculo(v)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
-                                            >
-                                                <Copy className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => abrirEditar(v)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
-                                            >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                                Editar
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setVehiculoAEliminar(v)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                Eliminar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {vehiculosPagina.map((v: any) => {
+                                    const diasVehiculo = diasBloqueadosPorPlaca(v.placa, picoPlacaConfig);
+                                    const bloqueadoHoy = diasVehiculo.includes(new Date().getDay());
+                                    const listoParaVenta = v.activo && estaListoParaVenta(v.fecha_ingreso);
+                                    const estiloSombreado = listoParaVenta
+                                        ? { backgroundColor: COLOR_SOMBREADO_LISTO_VENTA }
+                                        : bloqueadoHoy
+                                            ? { backgroundColor: COLOR_SOMBREADO_PICO_PLACA }
+                                            : undefined;
+                                    return (
+                                        <tr key={v.id} className="border-t border-[#e5e5e5]">
+                                            <td className="px-4 py-3 font-medium text-[#051620]" style={estiloSombreado}>KIA {v.modelo}</td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.version || '—'}</td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.placa}</td>
+                                            <td className="px-4 py-3 text-[#666] capitalize" style={estiloSombreado}>{v.categoria}</td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.sedes ? v.sedes.nombre : '—'}</td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                                {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                                {v.fecha_ingreso || '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                                <span className={'inline-flex items-center gap-1.5' + (bloqueadoHoy ? ' text-amber-700 font-medium' : '')}>
+                                                    {bloqueadoHoy && <Car className="w-4 h-4" />}
+                                                    {diasVehiculo.length > 0
+                                                        ? DIAS_SEMANA_PICO_PLACA.filter((d) => diasVehiculo.includes(d.value)).map((d) => d.label.slice(0, 3)).join(', ')
+                                                        : '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3" style={estiloSombreado}>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
+                                                        {v.activo ? 'Activo' : 'Inactivo'}
+                                                    </span>
+                                                    {bloqueadoHoy && (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full bg-amber-100 text-amber-900">
+                                                            <Car className="w-3 h-3" />
+                                                            PyP
+                                                        </span>
+                                                    )}
+                                                    {listoParaVenta && (
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full bg-red-100 text-red-700">
+                                                            <Tag className="w-3 h-3" />
+                                                            Listo para vender
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-right whitespace-nowrap" style={estiloSombreado}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => duplicarVehiculo(v)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => abrirEditar(v)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    Editar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setVehiculoAEliminar(v)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    Eliminar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -619,6 +686,18 @@ export default function VehiculosAdminPage() {
                                 />
                             </div>
 
+                            <div>
+                                <label className="text-xs text-[#666] block mb-1">Fecha de ingreso a la flota</label>
+                                <Input
+                                    type="date"
+                                    value={form.fechaIngreso}
+                                    onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
+                                />
+                                <p className="text-xs text-[#999] mt-1">
+                                    A los 3 meses de esta fecha el vehiculo se marca "Listo para vender".
+                                </p>
+                            </div>
+
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -629,6 +708,15 @@ export default function VehiculosAdminPage() {
                                 <span className="text-sm text-[#051620]">Vehiculo activo (visible para agendar)</span>
                             </label>
                         </div>
+
+                        {form.placa && (() => {
+                            const dias = diasBloqueadosPorPlaca(form.placa, picoPlacaConfig);
+                            return dias.length > 0 ? (
+                                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-sm px-3 py-2 mb-4">
+                                    Pico y placa: esta placa queda bloqueada los {DIAS_SEMANA_PICO_PLACA.filter((d) => dias.includes(d.value)).map((d) => d.label).join(', ')}. Se calcula automatico segun la <a href="/admin/pico-placa" className="underline">configuracion vigente</a>.
+                                </p>
+                            ) : null;
+                        })()}
 
                         {errorMsg && (
                             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3 mb-4">

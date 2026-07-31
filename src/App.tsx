@@ -11,8 +11,12 @@ import AdminLayout from './pages/admin/AdminLayout';
 import ReservasAdminPage from './pages/admin/ReservasAdminPage';
 import CalendarioAdminPage from './pages/admin/CalendarioAdminPage';
 import ConductoresAdminPage from './pages/admin/ConductoresAdminPage';
+import AsesoresAdminPage from './pages/admin/AsesoresAdminPage';
 import VehiculosAdminPage from './pages/admin/VehiculosAdminPage';
+import PicoPlacaAdminPage from './pages/admin/PicoPlacaAdminPage';
 import ReportesAdminPage from './pages/admin/ReportesAdminPage';
+import NotificacionesAdminPage from './pages/admin/NotificacionesAdminPage';
+import DiasBloqueadosAdminPage from './pages/admin/DiasBloqueadosAdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,7 +46,11 @@ export default function App() {
             <Route index element={<ReservasAdminPage />} />
             <Route path="calendario" element={<CalendarioAdminPage />} />
             <Route path="conductores" element={<ConductoresAdminPage />} />
+            <Route path="asesores" element={<AsesoresAdminPage />} />
             <Route path="vehiculos" element={<VehiculosAdminPage />} />
+            <Route path="pico-placa" element={<PicoPlacaAdminPage />} />
+            <Route path="notificaciones" element={<NotificacionesAdminPage />} />
+            <Route path="dias-bloqueados" element={<DiasBloqueadosAdminPage />} />
             <Route path="reportes" element={<ReportesAdminPage />} />
           </Route>
 

@@ -3,6 +3,30 @@
     color: #051620;
 }
 
+.rbc-calendar,
+.rbc-calendar * {
+    box-sizing: border-box;
+}
+
+.rbc-month-row {
+    overflow: hidden;
+}
+
+.rbc-row-bg,
+.rbc-row-content {
+    min-height: 100%;
+}
+
+.rbc-row-content {
+    pointer-events: none;
+}
+
+.rbc-row-content .rbc-date-cell,
+.rbc-row-content .rbc-date-cell button,
+.rbc-row-content .rbc-show-more {
+    pointer-events: auto;
+}
+
 .rbc-toolbar button {
     color: #051620;
     border-color: #e5e5e5;
@@ -81,4 +105,16 @@
 
 .rbc-day-bg.dia-seleccionado {
     background-color: #051620;
+}
+
+.rbc-day-bg.dia-clickeable {
+    cursor: pointer;
+}
+
+.rbc-day-bg.dia-admin-libre:hover {
+    background-color: #f0f0f0;
+}
+
+.rbc-day-bg.dia-bloqueado.dia-clickeable:hover {
+    background-color: #f2a8a8;
 }

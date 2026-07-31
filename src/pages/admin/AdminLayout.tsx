@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
-import { Bell, BellOff, ClipboardList, CalendarDays, Users, BarChart3, Car, LogOut, X } from 'lucide-react';
+import { Bell, BellOff, ClipboardList, CalendarDays, Users, UserRound, BarChart3, Car, LogOut, X, CalendarClock, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
+import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
 import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
 import loadingGif from '../../assets/images/loading/loading_coche.gif';
@@ -11,7 +12,11 @@ const LINKS = [
     { to: '/admin', label: 'Reservas', icon: ClipboardList },
     { to: '/admin/calendario', label: 'Calendario', icon: CalendarDays },
     { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
+    { to: '/admin/pico-placa', label: 'Pico y placa', icon: CalendarClock },
+    { to: '/admin/dias-bloqueados', label: 'Dias bloqueados', icon: Ban },
     { to: '/admin/conductores', label: 'Conductores', icon: Users },
+    { to: '/admin/asesores', label: 'Asesores', icon: UserRound },
+    { to: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
     { to: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
 ];
 
@@ -53,6 +58,7 @@ export default function AdminLayout() {
     const navigate = useNavigate();
     const { perfil, cargando, setPerfil } = useAdminStore();
     const [pendientes, setPendientes] = useState(0);
+    const [alertasVenta, setAlertasVenta] = useState(0);
     const [permiso, setPermiso] = useState<NotificationPermission>('default');
     const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -106,6 +112,16 @@ export default function AdminLayout() {
             .eq('estado', 'pendiente');
         setPendientes(res.count || 0);
     }
+
+    async function cargarAlertasVenta() {
+        const res = await supabase.from('vehiculos').select('fecha_ingreso, activo').eq('activo', true);
+        const total = (res.data || []).filter((v: any) => estaListoParaVenta(v.fecha_ingreso)).length;
+        setAlertasVenta(total);
+    }
+
+    useEffect(() => {
+        cargarAlertasVenta();
+    }, []);
 
     useEffect(() => {
         cargarConteoPendientes();
@@ -214,6 +230,11 @@ export default function AdminLayout() {
                                     {link.to === '/admin' && pendientes > 0 && (
                                         <span className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                                             {pendientes}
+                                        </span>
+                                    )}
+                                    {link.to === '/admin/notificaciones' && alertasVenta > 0 && (
+                                        <span className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                            {alertasVenta}
                                         </span>
                                     )}
                                 </NavLink>

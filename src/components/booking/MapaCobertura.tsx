@@ -1,139 +1,119 @@
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Circle, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { GoogleMap, useJsApiLoader, Circle, Marker, InfoWindow } from '@react-google-maps/api';
 import { supabase } from '../../lib/supabaseClient';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
 const SEDES = [
     {
         id: 'premium',
         nombre: 'Distrikia Premium',
         direccion: 'Calle 29 #43A-47, Medellín',
-        coords: [6.2280, -75.5705] as [number, number],
+        coords: { lat: 6.2280, lng: -75.5705 },
         radioKm: 5,
     },
     {
         id: 'la-10',
         nombre: 'Distrikia La 10',
         direccion: 'Calle 10 #50-264, Medellín',
-        coords: [6.2147, -75.5809] as [number, number],
+        coords: { lat: 6.2147, lng: -75.5809 },
         radioKm: 5,
     },
     {
         id: 'palace',
         nombre: 'Distrikia Palacé',
         direccion: 'Carrera 50 #32-164, Medellín',
-        coords: [6.2350, -75.5736] as [number, number],
+        coords: { lat: 6.2350, lng: -75.5736 },
         radioKm: 4,
     },
     {
         id: 'llanogrande',
         nombre: 'Distrikia Llanogrande',
         direccion: 'Km 6 Vía Don Diego, Rionegro',
-        coords: [6.1215, -75.4266] as [number, number],
+        coords: { lat: 6.1215, lng: -75.4266 },
         radioKm: 6,
     },
     {
         id: 'monteria',
         nombre: 'Distrikia Montería',
         direccion: 'Calle 73 #05-76, Montería',
-        coords: [8.7838, -75.8598] as [number, number],
+        coords: { lat: 8.7838, lng: -75.8598 },
         radioKm: 5,
     },
     {
         id: 'sincelejo',
         nombre: 'Distrikia Sincelejo',
         direccion: 'Calle 32 #27B-82, Sincelejo',
-        coords: [9.3033, -75.3771] as [number, number],
+        coords: { lat: 9.3033, lng: -75.3771 },
         radioKm: 4,
     },
     {
         id: 'apartado',
         nombre: 'Distrikia Apartadó',
         direccion: 'Carrera 100 #77-502, Apartadó',
-        coords: [7.8728, -76.6346] as [number, number],
+        coords: { lat: 7.8728, lng: -76.6346 },
         radioKm: 4,
     },
 ];
 
-const COLOMBIA_CENTER: [number, number] = [6.2442, -75.5812];
+const COLOMBIA_CENTER = { lat: 6.2442, lng: -75.5812 };
+
+// Estilo del mapa: quita puntos de interes y transporte para que se vea limpio, como Voyager/CartoDB
+const MAP_STYLES: google.maps.MapTypeStyle[] = [
+    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+];
 
 interface Props {
     onCobertura: (tiene: boolean, direccion: string, coords: [number, number]) => void;
 }
 
-function MoverMapa({ coords }: { coords: [number, number] | null }) {
-    const map = useMap();
-    useEffect(() => {
-        if (coords) map.flyTo(coords, 16, { duration: 1.2 });
-    }, [coords, map]);
-    return null;
+function calcularDistanciaKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLon = ((b.lng - a.lng) * Math.PI) / 180;
+    const x =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((a.lat * Math.PI) / 180) *
+        Math.cos((b.lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-const iconUsuario = L.divIcon({
-    className: '',
-    html: `
-    <svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));">
-      <path d="M17 0C7.6 0 0 7.6 0 17c0 12.4 17 27 17 27s17-14.6 17-27C34 7.6 26.4 0 17 0z" fill="#051620"/>
-      <circle cx="17" cy="17" r="6.5" fill="white"/>
-    </svg>
-  `,
-    iconSize: [34, 44],
-    iconAnchor: [17, 44],
-});
+function dentroDeCobertura(coords: { lat: number; lng: number }): boolean {
+    return SEDES.some((sede) => calcularDistanciaKm(coords, sede.coords) <= sede.radioKm);
+}
 
-const iconSede = L.divIcon({
-    className: '',
-    html: `<div style="
-    width:12px;height:12px;border-radius:50%;
-    background:#051620;border:2px solid white;
-    box-shadow:0 1px 4px rgba(0,0,0,.3)
-  "></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-});
+function sedesCercanas(coords: { lat: number; lng: number }) {
+    return SEDES.filter((sede) => calcularDistanciaKm(coords, sede.coords) <= sede.radioKm);
+}
 
 export function MapaCobertura({ onCobertura }: Props) {
+    const { isLoaded, loadError } = useJsApiLoader({
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+        id: 'distrikia-google-maps',
+    });
+
     const [busqueda, setBusqueda] = useState('');
     const [sugerencias, setSugerencias] = useState<any[]>([]);
-    const [coordsUsuario, setCoordsUsuario] = useState<[number, number] | null>(null);
+    const [coordsUsuario, setCoordsUsuario] = useState<{ lat: number; lng: number } | null>(null);
     const [direccionSel, setDireccionSel] = useState('');
     const [direccionEditable, setDireccionEditable] = useState('');
     const [buscando, setBuscando] = useState(false);
+    const [sedePopup, setSedePopup] = useState<string | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const mapRef = useRef<google.maps.Map | null>(null);
+    const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
-    function calcularDistanciaKm(a: [number, number], b: [number, number]): number {
-        const R = 6371;
-        const dLat = ((b[0] - a[0]) * Math.PI) / 180;
-        const dLon = ((b[1] - a[1]) * Math.PI) / 180;
-        const x =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((a[0] * Math.PI) / 180) *
-            Math.cos((b[0] * Math.PI) / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-    }
+    useEffect(() => {
+        if (isLoaded && !geocoderRef.current) {
+            geocoderRef.current = new google.maps.Geocoder();
+        }
+    }, [isLoaded]);
 
-    function dentroDeCobertura(coords: [number, number]): boolean {
-        return SEDES.some((sede) => {
-            const distancia = calcularDistanciaKm(coords, sede.coords);
-            return distancia <= sede.radioKm;
-        });
-    }
-
-    function sedesCercanas(coords: [number, number]) {
-        return SEDES.filter((sede) => {
-            const distancia = calcularDistanciaKm(coords, sede.coords);
-            return distancia <= sede.radioKm;
-        });
-    }
+    const onMapLoad = useCallback((map: google.maps.Map) => {
+        mapRef.current = map;
+    }, []);
 
     function buscarDireccion(texto: string) {
         setBusqueda(texto);
@@ -157,52 +137,47 @@ export function MapaCobertura({ onCobertura }: Props) {
         }, 300);
     }
 
-    function actualizarUbicacion(coords: [number, number], direccion: string) {
+    function actualizarUbicacion(coords: { lat: number; lng: number }, direccion: string) {
         setCoordsUsuario(coords);
         setDireccionSel(direccion);
         setDireccionEditable(direccion);
         const tiene = dentroDeCobertura(coords);
-        onCobertura(tiene, direccion, coords);
+        onCobertura(tiene, direccion, [coords.lat, coords.lng]);
+        mapRef.current?.panTo(coords);
+        mapRef.current?.setZoom(16);
     }
 
     function onEditarDireccion(nuevoTexto: string) {
         setDireccionEditable(nuevoTexto);
         if (coordsUsuario) {
             const tiene = dentroDeCobertura(coordsUsuario);
-            onCobertura(tiene, nuevoTexto, coordsUsuario);
+            onCobertura(tiene, nuevoTexto, [coordsUsuario.lat, coordsUsuario.lng]);
         }
     }
 
     function seleccionarDireccion(item: any) {
-        const coords: [number, number] = [Number(item.latitud), Number(item.longitud)];
+        const coords = { lat: Number(item.latitud), lng: Number(item.longitud) };
         const direccion = item.nombre + ', ' + item.municipio;
         setBusqueda(direccion);
         setSugerencias([]);
         actualizarUbicacion(coords, direccion);
     }
 
-    async function onArrastrarPin(e: any) {
-        const marker = e.target;
-        const posicion = marker.getLatLng();
-        const coords: [number, number] = [posicion.lat, posicion.lng];
+    function onArrastrarPin(e: google.maps.MapMouseEvent) {
+        if (!e.latLng || !geocoderRef.current) return;
+        const coords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
 
         setBuscando(true);
-        try {
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&addressdetails=1`,
-                { headers: { 'Accept-Language': 'es' } }
-            );
-            const data = await res.json();
-            const direccion = data.display_name
-                ? data.display_name.split(',').slice(0, 3).join(',')
-                : 'Ubicacion seleccionada en el mapa';
-            setBusqueda(direccion);
-            actualizarUbicacion(coords, direccion);
-        } catch {
-            actualizarUbicacion(coords, direccionSel);
-        } finally {
+        geocoderRef.current.geocode({ location: coords, language: 'es' }, (resultados, status) => {
             setBuscando(false);
-        }
+            if (status === 'OK' && resultados && resultados[0]) {
+                const direccion = resultados[0].formatted_address;
+                setBusqueda(direccion);
+                actualizarUbicacion(coords, direccion);
+            } else {
+                actualizarUbicacion(coords, direccionSel || 'Ubicacion seleccionada en el mapa');
+            }
+        });
     }
 
     const tieneCobertura = coordsUsuario ? dentroDeCobertura(coordsUsuario) : null;
@@ -246,67 +221,78 @@ export function MapaCobertura({ onCobertura }: Props) {
 
             {/* Mapa */}
             <div className="rounded-sm overflow-hidden border border-[#e5e5e5]" style={{ height: 380, zIndex: 0 }}>
-                <MapContainer
-                    center={COLOMBIA_CENTER}
-                    zoom={12}
-                    style={{ height: '100%', width: '100%' }}
-                    zoomControl={true}
-                >
-                    {/* Tile con colores tipo Google Maps */}
-                    <TileLayer
-                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-                    />
+                {loadError ? (
+                    <div className="w-full h-full flex items-center justify-center bg-[#f8f8f8]">
+                        <p className="text-sm text-red-600">No se pudo cargar Google Maps. Revisa la API key.</p>
+                    </div>
+                ) : !isLoaded ? (
+                    <div className="w-full h-full flex items-center justify-center bg-[#f8f8f8] animate-pulse">
+                        <p className="text-sm text-[#999]">Cargando mapa...</p>
+                    </div>
+                ) : (
+                    <GoogleMap
+                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                        center={COLOMBIA_CENTER}
+                        zoom={12}
+                        onLoad={onMapLoad}
+                        options={{
+                            styles: MAP_STYLES,
+                            streetViewControl: false,
+                            mapTypeControl: false,
+                            fullscreenControl: false,
+                        }}
+                    >
+                        {/* Circulos de cobertura por sede */}
+                        {SEDES.map((sede) => (
+                            <Circle
+                                key={sede.id}
+                                center={sede.coords}
+                                radius={sede.radioKm * 1000}
+                                options={{
+                                    strokeColor: '#051620',
+                                    strokeWeight: 1.5,
+                                    fillColor: '#051620',
+                                    fillOpacity: 0.08,
+                                }}
+                            />
+                        ))}
 
-                    {/* Círculos de cobertura por sede */}
-                    {SEDES.map((sede) => (
-                        <Circle
-                            key={sede.id}
-                            center={sede.coords}
-                            radius={sede.radioKm * 1000}
-                            pathOptions={{
-                                color: '#051620',
-                                fillColor: '#051620',
-                                fillOpacity: 0.08,
-                                weight: 1.5,
-                                dashArray: '5 5',
-                            }}
-                        >
-                            <Popup>
-                                <div className="text-xs">
-                                    <p className="font-semibold">{sede.nombre}</p>
-                                    <p className="text-gray-500">{sede.direccion}</p>
-                                </div>
-                            </Popup>
-                        </Circle>
-                    ))}
+                        {/* Marcadores de sedes */}
+                        {SEDES.map((sede) => (
+                            <Marker
+                                key={'marker-' + sede.id}
+                                position={sede.coords}
+                                icon={{
+                                    path: google.maps.SymbolPath.CIRCLE,
+                                    scale: 6,
+                                    fillColor: '#051620',
+                                    fillOpacity: 1,
+                                    strokeColor: 'white',
+                                    strokeWeight: 2,
+                                }}
+                                onClick={() => setSedePopup(sede.id)}
+                            >
+                                {sedePopup === sede.id && (
+                                    <InfoWindow onCloseClick={() => setSedePopup(null)}>
+                                        <div className="text-xs">
+                                            <p className="font-semibold">{sede.nombre}</p>
+                                            <p className="text-gray-500">{sede.direccion}</p>
+                                        </div>
+                                    </InfoWindow>
+                                )}
+                            </Marker>
+                        ))}
 
-                    {/* Marcadores de sedes */}
-                    {SEDES.map((sede) => (
-                        <Marker key={`marker-${sede.id}`} position={sede.coords} icon={iconSede}>
-                            <Popup>
-                                <div className="text-xs">
-                                    <p className="font-semibold">{sede.nombre}</p>
-                                    <p className="text-gray-500">{sede.direccion}</p>
-                                </div>
-                            </Popup>
-                        </Marker>
-                    ))}
-
-                    {/* Pin del usuario */}
-                    {coordsUsuario && (
-                        <Marker
-                            position={coordsUsuario}
-                            icon={iconUsuario}
-                            draggable={true}
-                            eventHandlers={{ dragend: onArrastrarPin }}
-                        >
-                            <Popup>Arrastra el pin para ajustar tu ubicacion exacta</Popup>
-                        </Marker>
-                    )}
-
-                    <MoverMapa coords={coordsUsuario} />
-                </MapContainer>
+                        {/* Pin del usuario */}
+                        {coordsUsuario && (
+                            <Marker
+                                position={coordsUsuario}
+                                draggable={true}
+                                onDragEnd={onArrastrarPin}
+                            />
+                        )}
+                    </GoogleMap>
+                )}
             </div>
 
             {coordsUsuario && (

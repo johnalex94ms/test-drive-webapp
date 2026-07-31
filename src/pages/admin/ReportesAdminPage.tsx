@@ -16,6 +16,27 @@ function haceNDias(n: number) {
     return d.toISOString().slice(0, 10);
 }
 
+function ChartTooltip({ active, payload, label }: any) {
+    if (!active || !payload || payload.length === 0) return null;
+    return (
+        <div className="bg-white border border-[#e5e5e5] rounded-md shadow-md px-3 py-2 text-xs">
+            {label && <p className="font-medium text-[#051620] mb-1">{label}</p>}
+            <div className="flex flex-col gap-0.5">
+                {payload.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                        <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: item.color || item.fill }}
+                        />
+                        <span className="text-[#666]">{item.name || 'Total'}:</span>
+                        <span className="font-semibold text-[#051620]">{item.value}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 const ESTADOS_LABEL: Record<string, string> = {
     pendiente: 'Pendiente',
     confirmada: 'Confirmada',
@@ -377,12 +398,20 @@ export default function ReportesAdminPage() {
                     <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6">
                         <p className="text-sm font-semibold text-[#051620] mb-3">Pruebas por dia</p>
                         <ResponsiveContainer width="100%" height={220}>
-                            <LineChart data={porDia}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                                <XAxis dataKey="fecha" fontSize={11} stroke="#999" />
-                                <YAxis allowDecimals={false} fontSize={11} stroke="#999" />
-                                <Tooltip />
-                                <Line type="monotone" dataKey="total" stroke="#051620" strokeWidth={2} dot={{ r: 3 }} />
+                            <LineChart data={porDia} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                <XAxis dataKey="fecha" fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} />
+                                <YAxis allowDecimals={false} fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} width={30} />
+                                <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#e5e5e5', strokeWidth: 1 }} />
+                                <Line
+                                    type="monotone"
+                                    dataKey="total"
+                                    name="Pruebas"
+                                    stroke="#051620"
+                                    strokeWidth={2}
+                                    dot={{ r: 3, fill: '#051620', strokeWidth: 0 }}
+                                    activeDot={{ r: 5 }}
+                                />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -392,12 +421,12 @@ export default function ReportesAdminPage() {
                         <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
                             <p className="text-sm font-semibold text-[#051620] mb-3">Pruebas por vehiculo</p>
                             <ResponsiveContainer width="100%" height={260}>
-                                <BarChart data={porVehiculo} layout="vertical" margin={{ left: 10 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" horizontal={false} />
-                                    <XAxis type="number" allowDecimals={false} fontSize={11} stroke="#999" />
-                                    <YAxis type="category" dataKey="vehiculo" fontSize={11} stroke="#666" width={100} />
-                                    <Tooltip />
-                                    <Bar dataKey="total" fill="#051620" radius={[0, 4, 4, 0]} />
+                                <BarChart data={porVehiculo} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barCategoryGap={10}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} />
+                                    <YAxis type="category" dataKey="vehiculo" fontSize={11} stroke="#666" axisLine={false} tickLine={false} width={100} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8f8f8' }} />
+                                    <Bar dataKey="total" name="Pruebas" fill="#051620" radius={[0, 6, 6, 0]} maxBarSize={22} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -406,12 +435,12 @@ export default function ReportesAdminPage() {
                         <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
                             <p className="text-sm font-semibold text-[#051620] mb-3">Pruebas por sede</p>
                             <ResponsiveContainer width="100%" height={260}>
-                                <BarChart data={porSede}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                                    <XAxis dataKey="sede" fontSize={11} stroke="#999" />
-                                    <YAxis allowDecimals={false} fontSize={11} stroke="#999" />
-                                    <Tooltip />
-                                    <Bar dataKey="total" fill="#0a4a8a" radius={[4, 4, 0, 0]} />
+                                <BarChart data={porSede} margin={{ top: 4, right: 12, left: -12, bottom: 0 }} barCategoryGap={16}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                    <XAxis dataKey="sede" fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} />
+                                    <YAxis allowDecimals={false} fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} width={30} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8f8f8' }} />
+                                    <Bar dataKey="total" name="Pruebas" fill="#0a4a8a" radius={[6, 6, 0, 0]} maxBarSize={48} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -424,12 +453,12 @@ export default function ReportesAdminPage() {
                             <p className="text-sm text-[#666]">Ninguna reserva en este rango tiene conductor asignado.</p>
                         ) : (
                             <ResponsiveContainer width="100%" height={Math.max(200, porConductor.length * 40)}>
-                                <BarChart data={porConductor} layout="vertical" margin={{ left: 10 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" horizontal={false} />
-                                    <XAxis type="number" allowDecimals={false} fontSize={11} stroke="#999" />
-                                    <YAxis type="category" dataKey="conductor" fontSize={11} stroke="#666" width={120} />
-                                    <Tooltip />
-                                    <Bar dataKey="total" fill="#0a6e3a" radius={[0, 4, 4, 0]} />
+                                <BarChart data={porConductor} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barCategoryGap={10}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} fontSize={11} stroke="#999" axisLine={false} tickLine={false} tickMargin={8} />
+                                    <YAxis type="category" dataKey="conductor" fontSize={11} stroke="#666" axisLine={false} tickLine={false} width={120} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8f8f8' }} />
+                                    <Bar dataKey="total" name="Pruebas" fill="#0a6e3a" radius={[0, 6, 6, 0]} maxBarSize={22} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}

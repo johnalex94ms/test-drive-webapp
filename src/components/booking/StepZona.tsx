@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, Navigation, Phone, Mail, Play } from 'lucide-react';
+import { MapPin, Navigation, Phone, Mail, Play, Gauge, Zap, Settings2, Fuel } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useBookingStore } from '../../store/bookingStore';
 import type { Zona } from '../../lib/types';
@@ -60,6 +60,11 @@ export function StepZona() {
                 : null,
         }));
     }, [vehiculos, ubicacionCliente]);
+
+    const vehiculoSedeActual = useMemo(() => {
+        if (!sedeSeleccionada) return null;
+        return vehiculos.find((v: any) => v.sede_id === sedeSeleccionada.id) || null;
+    }, [vehiculos, sedeSeleccionada]);
 
     const idSedeMasCercana = useMemo(() => {
         const conDistancia = sedesDisponibles.filter((s) => s.distancia !== null);
@@ -273,6 +278,49 @@ export function StepZona() {
                                             Ir con Maps
                                         </button>
                                     )}
+                                </div>
+                            )}
+
+                            {vehiculoSedeActual && (
+                                <div className="mt-4 pt-4 border-t border-[#e5e5e5]">
+                                    <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
+                                        KIA {modelo}{vehiculoSedeActual.version ? ' · ' + vehiculoSedeActual.version : ''}
+                                    </p>
+                                    <div className="flex gap-3">
+                                        {vehiculoSedeActual.imagenes_360 && vehiculoSedeActual.imagenes_360.length > 0 && (
+                                            <img
+                                                src={vehiculoSedeActual.imagenes_360[0]}
+                                                alt={'KIA ' + modelo}
+                                                className="w-24 h-24 rounded-sm object-cover flex-shrink-0"
+                                            />
+                                        )}
+                                        <div className="flex flex-col gap-1.5 text-xs text-[#666] justify-center">
+                                            {vehiculoSedeActual.motor && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Fuel className="w-3.5 h-3.5 text-[#999] flex-shrink-0" />
+                                                    Motor: {vehiculoSedeActual.motor}
+                                                </span>
+                                            )}
+                                            {vehiculoSedeActual.potencia && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Zap className="w-3.5 h-3.5 text-[#999] flex-shrink-0" />
+                                                    Potencia: {vehiculoSedeActual.potencia}
+                                                </span>
+                                            )}
+                                            {vehiculoSedeActual.velocidad_max && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Gauge className="w-3.5 h-3.5 text-[#999] flex-shrink-0" />
+                                                    Vel. maxima: {vehiculoSedeActual.velocidad_max}
+                                                </span>
+                                            )}
+                                            {vehiculoSedeActual.tipo_cambio && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Settings2 className="w-3.5 h-3.5 text-[#999] flex-shrink-0" />
+                                                    Cambios: {vehiculoSedeActual.tipo_cambio}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>

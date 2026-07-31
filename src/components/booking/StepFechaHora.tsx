@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useBookingStore } from '../../store/bookingStore';
 import { ReservaModal } from './ReservaModal';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
+import { diasBloqueadosPorPlaca, type DiaPicoPlaca } from '../../lib/picoPlaca';
 
 const localizer = dateFnsLocalizer({
     format,
@@ -18,26 +19,29 @@ const localizer = dateFnsLocalizer({
     locales: { es },
 });
 
-function esDiaBloqueado(date: Date, diasCompletos: any) {
+function esDiaBloqueado(date: Date, diasCompletos: any, diasPicoPlaca: number[] = [], fechasBloqueadas: Record<string, string> = {}) {
     const diaStr = format(date, 'yyyy-MM-dd');
     const hoyInicio = new Date();
     hoyInicio.setHours(0, 0, 0, 0);
     const esPasado = date < hoyInicio;
     const esDomingo = date.getDay() === 0;
+    const esPicoPlaca = diasPicoPlaca.includes(date.getDay());
+    const esFechaBloqueada = !!fechasBloqueadas[diaStr];
     const completo = !!diasCompletos[diaStr];
-    return esPasado || esDomingo || completo;
+    return esPasado || esDomingo || esPicoPlaca || esFechaBloqueada || completo;
 }
 
-function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any) {
+function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any, diasPicoPlaca: number[], fechasBloqueadas: Record<string, string>) {
     const date = props.date;
     const diaStr = format(date, 'yyyy-MM-dd');
-    const bloqueado = esDiaBloqueado(date, diasCompletos);
+    const bloqueado = esDiaBloqueado(date, diasCompletos, diasPicoPlaca, fechasBloqueadas);
 
     return (
         <button
             type="button"
             disabled={bloqueado}
             onClick={() => onDiaClick(diaStr)}
+            title={fechasBloqueadas[diaStr] || undefined}
             style={{
                 width: '100%',
                 height: '100%',
@@ -55,17 +59,19 @@ function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any) {
     );
 }
 
-function getDayPropGetter(ocupadosPorDia: any, diasCompletos: any) {
+function getDayPropGetter(ocupadosPorDia: any, diasCompletos: any, diasPicoPlaca: number[], fechasBloqueadas: Record<string, string>) {
     return function (date: Date) {
         const diaStr = format(date, 'yyyy-MM-dd');
         const hoyInicio = new Date();
         hoyInicio.setHours(0, 0, 0, 0);
         const esPasado = date < hoyInicio;
         const esDomingo = date.getDay() === 0;
+        const esPicoPlaca = diasPicoPlaca.includes(date.getDay());
+        const esFechaBloqueada = !!fechasBloqueadas[diaStr];
         const completo = !!diasCompletos[diaStr];
         const conOcupacion = ocupadosPorDia[diaStr] && ocupadosPorDia[diaStr].length > 0;
 
-        if (esPasado || esDomingo) return { className: 'dia-lleno' };
+        if (esPasado || esDomingo || esPicoPlaca || esFechaBloqueada) return { className: 'dia-lleno' };
         if (completo) return { className: 'dia-bloqueado' };
         if (conOcupacion) return { className: 'dia-ocupado-parcial' };
         return { className: 'dia-libre' };
@@ -98,7 +104,32 @@ export function StepFechaHora() {
         },
     });
 
+    const picoPlacaConfigQuery = useQuery({
+        queryKey: ['pico-placa-config'],
+        queryFn: async () => {
+            const res = await supabase.from('pico_placa_config').select('*').order('dia_semana');
+            return (res.data || []) as DiaPicoPlaca[];
+        },
+    });
+
+    const diasBloqueadosQuery = useQuery({
+        queryKey: ['dias-bloqueados', inicioMesStr, finMesStr],
+        queryFn: async () => {
+            const res = await supabase
+                .from('dias_bloqueados')
+                .select('*')
+                .gte('fecha', inicioMesStr)
+                .lte('fecha', finMesStr);
+            return res.data || [];
+        },
+    });
+
     const reservas = reservasQuery.data || [];
+    const diasPicoPlaca = vehiculo ? diasBloqueadosPorPlaca(vehiculo.placa, picoPlacaConfigQuery.data || []) : [];
+    const fechasBloqueadas: Record<string, string> = {};
+    (diasBloqueadosQuery.data || []).forEach((d: any) => {
+        fechasBloqueadas[d.fecha] = d.motivo;
+    });
 
     const ocupadosPorDia: Record<string, string[]> = {};
     reservas.forEach((r: any) => {
@@ -125,7 +156,7 @@ export function StepFechaHora() {
     }
 
     function handleSelectSlot(slotInfo: any) {
-        if (esDiaBloqueado(slotInfo.start, diasCompletos)) return;
+        if (esDiaBloqueado(slotInfo.start, diasCompletos, diasPicoPlaca, fechasBloqueadas)) return;
         onDiaClick(format(slotInfo.start, 'yyyy-MM-dd'));
     }
 
@@ -167,10 +198,10 @@ export function StepFechaHora() {
                         dayHeaderFormat: (date: Date) => format(date, "EEEE d 'de' MMMM", { locale: es }),
                         weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
                     }}
-                    dayPropGetter={getDayPropGetter(ocupadosPorDia, diasCompletos)}
+                    dayPropGetter={getDayPropGetter(ocupadosPorDia, diasCompletos, diasPicoPlaca, fechasBloqueadas)}
                     components={{
                         month: {
-                            dateHeader: (props: any) => DiaPersonalizado(props, onDiaClick, diasCompletos),
+                            dateHeader: (props: any) => DiaPersonalizado(props, onDiaClick, diasCompletos, diasPicoPlaca, fechasBloqueadas),
                         },
                     }}
                     style={{ height: 600 }}
