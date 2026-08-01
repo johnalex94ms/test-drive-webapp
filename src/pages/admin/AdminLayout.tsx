@@ -1,23 +1,56 @@
-import { useEffect, useState } from 'react';
-import { Outlet, useNavigate, NavLink, Link } from 'react-router-dom';
-import { Bell, BellOff, ClipboardList, CalendarDays, Users, UserRound, BarChart3, Car, LogOut, X, CalendarClock, Ban } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Outlet, useNavigate, useLocation, NavLink, Link } from 'react-router-dom';
+import { Bell, BellRing, BellOff, ClipboardList, CalendarDays, Users, UserRound, BarChart3, Car, LogOut, X, CalendarClock, Ban, ChevronDown, PanelLeftDashed, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
 import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
+import logoDistridrive from '../../assets/images/logos/logotipo-distridrive.png';
+import isotipoDistrikia from '../../assets/images/logos/isopotipo-distrikia.webp';
 import loadingGif from '../../assets/images/loading/loading_coche.gif';
 
-const LINKS = [
-    { to: '/admin', label: 'Reservas', icon: ClipboardList },
-    { to: '/admin/calendario', label: 'Calendario', icon: CalendarDays },
-    { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
-    { to: '/admin/pico-placa', label: 'Pico y placa', icon: CalendarClock },
-    { to: '/admin/dias-bloqueados', label: 'Dias bloqueados', icon: Ban },
-    { to: '/admin/conductores', label: 'Conductores', icon: Users },
-    { to: '/admin/asesores', label: 'Asesores', icon: UserRound },
-    { to: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
-    { to: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
+type ModoSidebar = 'expanded' | 'collapsed' | 'hover';
+
+const OPCIONES_SIDEBAR: { value: ModoSidebar; label: string }[] = [
+    { value: 'expanded', label: 'Expandido' },
+    { value: 'collapsed', label: 'Colapsado' },
+    { value: 'hover', label: 'Expandir al pasar el mouse' },
+];
+
+interface NavLinkItem {
+    type: 'link';
+    to: string;
+    label: string;
+    icon: any;
+}
+
+interface NavGroupItem {
+    type: 'group';
+    label: string;
+    icon: any;
+    children: { to: string; label: string; icon: any }[];
+}
+
+const NAV: (NavLinkItem | NavGroupItem)[] = [
+    { type: 'link', to: '/admin', label: 'Reservas', icon: ClipboardList },
+    { type: 'link', to: '/admin/calendario', label: 'Calendario', icon: CalendarDays },
+    {
+        type: 'group', label: 'Flota', icon: Car, children: [
+            { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
+            { to: '/admin/pico-placa', label: 'Pico y placa', icon: CalendarClock },
+            { to: '/admin/dias-bloqueados', label: 'Dias bloqueados', icon: Ban },
+        ]
+    },
+    {
+        type: 'group', label: 'Equipo', icon: Users, children: [
+            { to: '/admin/conductores', label: 'Conductores', icon: Users },
+            { to: '/admin/asesores', label: 'Asesores', icon: UserRound },
+        ]
+    },
+    { type: 'link', to: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
+    { type: 'link', to: '/admin/reportes', label: 'Reportes', icon: BarChart3 },
 ];
 
 function reproducirSonido() {
@@ -56,11 +89,106 @@ interface Toast {
 
 export default function AdminLayout() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { perfil, cargando, setPerfil } = useAdminStore();
     const [pendientes, setPendientes] = useState(0);
     const [alertasVenta, setAlertasVenta] = useState(0);
     const [permiso, setPermiso] = useState<NotificationPermission>('default');
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>(() => {
+        const iniciales: Record<string, boolean> = {};
+        NAV.forEach((item) => {
+            if (item.type === 'group') {
+                iniciales[item.label] = item.children.some((c) => location.pathname === c.to);
+            }
+        });
+        return iniciales;
+    });
+    const [modoSidebar, setModoSidebar] = useState<ModoSidebar>(() => {
+        const guardado = localStorage.getItem('admin-sidebar-modo');
+        return (guardado as ModoSidebar) || 'expanded';
+    });
+    const [hoverActivo, setHoverActivo] = useState(false);
+    const [configAbierta, setConfigAbierta] = useState(false);
+    const [configPos, setConfigPos] = useState<{ bottom: number; left: number } | null>(null);
+    const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(null);
+    const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
+    const settingsBtnRef = useRef<HTMLButtonElement | null>(null);
+    const settingsPopoverRef = useRef<HTMLDivElement | null>(null);
+    const flyoutPopoverRef = useRef<HTMLDivElement | null>(null);
+    const grupoAbiertoColapsado = Object.keys(gruposAbiertos).find((k) => gruposAbiertos[k]);
+
+    const expandido = modoSidebar === 'expanded' ? true : modoSidebar === 'collapsed' ? false : hoverActivo;
+
+    function cambiarModoSidebar(modo: ModoSidebar) {
+        setModoSidebar(modo);
+        localStorage.setItem('admin-sidebar-modo', modo);
+        setConfigAbierta(false);
+    }
+
+    function toggleConfig() {
+        if (!configAbierta && settingsBtnRef.current) {
+            const rect = settingsBtnRef.current.getBoundingClientRect();
+            setConfigPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
+        }
+        setConfigAbierta((v) => !v);
+    }
+
+    useEffect(() => {
+        function alHacerClickFuera(e: MouseEvent) {
+            const target = e.target as Node;
+            if (
+                settingsBtnRef.current && !settingsBtnRef.current.contains(target) &&
+                settingsPopoverRef.current && !settingsPopoverRef.current.contains(target)
+            ) {
+                setConfigAbierta(false);
+            }
+            if (
+                flyoutPopoverRef.current && !flyoutPopoverRef.current.contains(target) &&
+                !(target as HTMLElement).closest?.('[data-nav-group-trigger]')
+            ) {
+                setGruposAbiertos((prev) => {
+                    const nuevo: Record<string, boolean> = {};
+                    Object.keys(prev).forEach((k) => { nuevo[k] = false; });
+                    return nuevo;
+                });
+            }
+        }
+        document.addEventListener('mousedown', alHacerClickFuera);
+        return () => document.removeEventListener('mousedown', alHacerClickFuera);
+    }, []);
+
+    function mostrarTooltip(e: React.MouseEvent<HTMLElement>, label: string) {
+        if (expandido) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltip({ label, top: rect.top + rect.height / 2, left: rect.right + 14 });
+    }
+
+    useEffect(() => {
+        if (expandido) setTooltip(null);
+    }, [expandido]);
+
+    function ocultarTooltip() {
+        setTooltip(null);
+    }
+
+    function toggleGrupo(label: string, e?: React.MouseEvent<HTMLButtonElement>) {
+        const yaAbierto = !!gruposAbiertos[label];
+        const rect = !yaAbierto && !expandido && e ? e.currentTarget.getBoundingClientRect() : null;
+
+        setGruposAbiertos(() => {
+            const nuevo: Record<string, boolean> = {};
+            NAV.forEach((item) => {
+                if (item.type === 'group') nuevo[item.label] = false;
+            });
+            nuevo[label] = !yaAbierto;
+            return nuevo;
+        });
+
+        if (rect) {
+            setFlyoutPos({ top: rect.top, left: rect.right + 14 });
+        }
+    }
 
     function mostrarToast(titulo: string, mensaje: string) {
         const id = Date.now();
@@ -204,63 +332,184 @@ export default function AdminLayout() {
 
     return (
         <div className="h-screen bg-[#f8f8f8] flex overflow-hidden">
-            <aside className="w-56 bg-[#051620] flex flex-col justify-between py-6 h-full flex-shrink-0 overflow-y-auto">
+            <aside
+                onMouseEnter={() => { if (modoSidebar === 'hover') setHoverActivo(true); }}
+                onMouseLeave={() => { if (modoSidebar === 'hover') setHoverActivo(false); }}
+                className={
+                    'bg-[#051620] flex flex-col justify-between py-6 h-full flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 relative ' +
+                    (expandido ? 'w-56' : 'w-16')
+                }
+            >
                 <div>
-                    <Link to="/admin" className="px-5 mb-8 block hover:opacity-80 transition-opacity">
-                        <img src={logoDistrikia} alt="Distrikia" className="h-5 mb-2" />
-                        <p className="font-display text-lg font-bold text-white">Panel admin</p>
-                    </Link>
-                    <nav className="flex flex-col gap-1 px-3">
-                        {LINKS.map((link) => {
-                            const Icon = link.icon;
-                            return (
-                                <NavLink
-                                    key={link.to}
-                                    to={link.to}
-                                    end
-                                    className={({ isActive }) =>
-                                        'px-3 py-2.5 rounded-sm text-sm font-medium transition-colors flex items-center justify-between ' +
-                                        (isActive ? 'bg-white text-[#051620]' : 'text-white/70 hover:bg-white/10')
+                    {expandido ? (
+                        <>
+                            <div className="px-5 mb-4 flex items-start justify-between gap-2">
+                                <Link to="/admin" className="hover:opacity-80 transition-opacity min-w-0">
+                                    <img src={logoDistrikia} alt="Distrikia" className="h-5" />
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={permiso === 'granted' ? undefined : activarNotificaciones}
+                                    title={permiso === 'granted' ? 'Notificaciones activas' : 'Activar notificaciones'}
+                                    className={
+                                        'bell-hover flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ' +
+                                        (permiso === 'granted' ? 'text-amber-400' : 'text-white/40 hover:text-white cursor-pointer hover:bg-white/10')
                                     }
                                 >
-                                    <span className="flex items-center gap-2.5">
-                                        <Icon className="w-4 h-4" />
-                                        {link.label}
-                                    </span>
-                                    {link.to === '/admin' && pendientes > 0 && (
-                                        <span className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                            {pendientes}
+                                    {permiso === 'granted' ? <BellRing className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                                </button>
+                            </div>
+                            <div className="px-5 mb-8 flex justify-center">
+                                <img src={logoDistridrive} alt="Panel admin" className="w-[130px] h-auto" />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="mb-8 flex flex-col items-center gap-2">
+                            <Link to="/admin" className="hover:opacity-80 transition-opacity">
+                                <img src={isotipoDistrikia} alt="Distrikia" className="h-8 w-8 object-contain" />
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={permiso === 'granted' ? undefined : activarNotificaciones}
+                                title={permiso === 'granted' ? 'Notificaciones activas' : 'Activar notificaciones'}
+                                className={
+                                    'bell-hover w-7 h-7 rounded-full flex items-center justify-center transition-colors ' +
+                                    (permiso === 'granted' ? 'text-amber-400' : 'text-white/40 hover:text-white cursor-pointer hover:bg-white/10')
+                                }
+                            >
+                                {permiso === 'granted' ? <BellRing className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    )}
+                    <nav className={'flex flex-col gap-1 ' + (expandido ? 'px-3' : 'px-2')}>
+                        {NAV.map((item) => {
+                            if (item.type === 'link') {
+                                const Icon = item.icon;
+                                const badge = item.to === '/admin' ? pendientes : item.to === '/admin/notificaciones' ? alertasVenta : 0;
+                                return (
+                                    <NavLink
+                                        key={item.to}
+                                        to={item.to}
+                                        end
+                                        onMouseEnter={(e) => mostrarTooltip(e, item.label)}
+                                        onMouseLeave={ocultarTooltip}
+                                        onClick={ocultarTooltip}
+                                        className={({ isActive }) =>
+                                            'relative rounded-sm text-[13px] font-medium transition-colors flex items-center ' +
+                                            (expandido ? 'px-3 py-2.5 justify-between' : 'px-0 py-2.5 justify-center') + ' ' +
+                                            (isActive ? 'bg-white text-[#051620]' : 'text-white/70 hover:bg-white/10')
+                                        }
+                                    >
+                                        <span className="flex items-center gap-2.5">
+                                            <Icon className="w-4 h-4" />
+                                            {expandido && item.label}
                                         </span>
-                                    )}
-                                    {link.to === '/admin/notificaciones' && alertasVenta > 0 && (
-                                        <span className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                            {alertasVenta}
+                                        {badge > 0 && (
+                                            expandido ? (
+                                                <span className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                                    {badge}
+                                                </span>
+                                            ) : (
+                                                <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-600" />
+                                            )
+                                        )}
+                                    </NavLink>
+                                );
+                            }
+
+                            const GroupIcon = item.icon;
+                            const abierto = !!gruposAbiertos[item.label];
+                            const grupoActivo = item.children.some((c) => location.pathname === c.to);
+
+                            return (
+                                <div key={item.label} className="relative group/navgroup">
+                                    <button
+                                        type="button"
+                                        data-nav-group-trigger
+                                        onClick={(e) => { toggleGrupo(item.label, e); ocultarTooltip(); }}
+                                        onMouseEnter={(e) => mostrarTooltip(e, item.label)}
+                                        onMouseLeave={ocultarTooltip}
+                                        className={
+                                            'w-full rounded-sm text-[13px] font-medium transition-colors flex items-center cursor-pointer ' +
+                                            (expandido ? 'px-3 py-2.5 justify-between' : 'px-0 py-2.5 justify-center') + ' ' +
+                                            (grupoActivo && !abierto ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/10')
+                                        }
+                                    >
+                                        <span className="flex items-center gap-2.5">
+                                            <GroupIcon className="w-4 h-4" />
+                                            {expandido && item.label}
                                         </span>
+                                        {expandido && (
+                                            <ChevronDown className={'w-3.5 h-3.5 transition-transform ' + (abierto ? 'rotate-180' : '')} />
+                                        )}
+                                    </button>
+
+                                    {/* Expandido: lista debajo, comportamiento normal */}
+                                    {expandido && abierto && (
+                                        <div className="flex flex-col gap-1 mt-1 pl-3">
+                                            {item.children.map((child) => {
+                                                const ChildIcon = child.icon;
+                                                return (
+                                                    <NavLink
+                                                        key={child.to}
+                                                        to={child.to}
+                                                        end
+                                                        className={({ isActive }) =>
+                                                            'px-3 py-2 rounded-sm text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
+                                                            (isActive ? 'bg-white text-[#051620]' : 'text-white/60 hover:bg-white/10')
+                                                        }
+                                                    >
+                                                        <ChildIcon className="w-3.5 h-3.5" />
+                                                        {child.label}
+                                                    </NavLink>
+                                                );
+                                            })}
+                                        </div>
                                     )}
-                                </NavLink>
+
+                                </div>
                             );
                         })}
                     </nav>
                 </div>
-                <div className="px-5 flex flex-col gap-3">
-                    {permiso !== 'granted' && (
-                        <button
-                            type="button"
-                            onClick={activarNotificaciones}
-                            className="flex items-center gap-2 text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
-                        >
-                            <BellOff className="w-3.5 h-3.5" />
-                            Activar notificaciones
-                        </button>
-                    )}
-                    {permiso === 'granted' && (
-                        <p className="flex items-center justify-center gap-2 text-xs text-white/40">
-                            <Bell className="w-3.5 h-3.5" />
-                            Notificaciones activas
-                        </p>
-                    )}
 
-                    {perfil && (
+                {/* Colapsado: flyout del grupo abierto, renderizado por fuera del aside via portal */}
+                {!expandido && grupoAbiertoColapsado && flyoutPos && createPortal(
+                    (() => {
+                        const grupo = NAV.find((i) => i.type === 'group' && i.label === grupoAbiertoColapsado) as NavGroupItem | undefined;
+                        if (!grupo) return null;
+                        return (
+                            <div
+                                ref={flyoutPopoverRef}
+                                style={{ position: 'fixed', top: flyoutPos.top, left: flyoutPos.left }}
+                                className="z-[200] bg-[#0a2030] border border-white/10 rounded-sm shadow-lg py-1.5 min-w-[170px]"
+                            >
+                                <p className="px-3 py-1 text-[10px] font-medium text-white/40 uppercase tracking-widest">{grupo.label}</p>
+                                {grupo.children.map((child) => {
+                                    const ChildIcon = child.icon;
+                                    return (
+                                        <NavLink
+                                            key={child.to}
+                                            to={child.to}
+                                            end
+                                            onClick={() => setGruposAbiertos((prev) => ({ ...prev, [grupo.label]: false }))}
+                                            className={({ isActive }) =>
+                                                'px-3 py-2 text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
+                                                (isActive ? 'bg-white text-[#051620]' : 'text-white/70 hover:bg-white/10')
+                                            }
+                                        >
+                                            <ChildIcon className="w-3.5 h-3.5" />
+                                            {child.label}
+                                        </NavLink>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })(),
+                    document.body
+                )}
+                <div className={'flex flex-col gap-3 ' + (expandido ? 'px-5' : 'px-2')}>
+                    {perfil && expandido && (
                         <div className="flex items-center gap-2.5 pt-3 border-t border-white/10">
                             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
                                 {obtenerIniciales(perfil.nombre)}
@@ -271,17 +520,99 @@ export default function AdminLayout() {
                             </div>
                         </div>
                     )}
+                    {perfil && !expandido && (
+                        <div className="flex justify-center pt-3 border-t border-white/10" title={perfil.nombre}>
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
+                                {obtenerIniciales(perfil.nombre)}
+                            </div>
+                        </div>
+                    )}
 
-                    <button
-                        type="button"
-                        onClick={cerrarSesion}
-                        className="flex items-center gap-2 text-sm text-white/60 hover:text-red-400 transition-colors cursor-pointer bg-white/5 hover:bg-red-500/10 rounded-sm px-3 py-2"
-                    >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Cerrar sesion
-                    </button>
+                    {/* Configuracion del sidebar + cerrar sesion */}
+                    {expandido ? (
+                        <div className="flex items-center justify-between gap-2">
+                            <button
+                                ref={settingsBtnRef}
+                                type="button"
+                                onClick={() => { toggleConfig(); ocultarTooltip(); }}
+                                className="flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer rounded-sm p-2 hover:bg-white/10 flex-shrink-0"
+                            >
+                                <PanelLeftDashed className="w-4 h-4 flex-shrink-0" />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={cerrarSesion}
+                                className="flex items-center gap-2 text-[13px] text-white/60 hover:text-red-400 transition-colors cursor-pointer rounded-sm p-2 hover:bg-red-500/10 flex-shrink-0"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Cerrar sesion
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                ref={settingsBtnRef}
+                                type="button"
+                                onClick={() => { toggleConfig(); ocultarTooltip(); }}
+                                onMouseEnter={(e) => mostrarTooltip(e, 'Sidebar control')}
+                                onMouseLeave={ocultarTooltip}
+                                className="w-full rounded-sm text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer text-white/60 hover:text-white hover:bg-white/10 px-0 py-2.5"
+                            >
+                                <PanelLeftDashed className="w-4 h-4 flex-shrink-0" />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={cerrarSesion}
+                                onMouseEnter={(e) => mostrarTooltip(e, 'Cerrar sesion')}
+                                onMouseLeave={ocultarTooltip}
+                                className="w-full rounded-sm text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer text-white/60 hover:text-red-400 hover:bg-red-500/10 px-0 py-2.5"
+                            >
+                                <LogOut className="w-4 h-4 flex-shrink-0" />
+                            </button>
+                        </>
+                    )}
+
+                    {configAbierta && configPos && createPortal(
+                        <div
+                            ref={settingsPopoverRef}
+                            style={{ position: 'fixed', bottom: configPos.bottom, left: configPos.left }}
+                            className="z-[200] bg-[#0a2030] border border-white/10 rounded-sm shadow-lg py-1.5 min-w-[200px]"
+                        >
+                            <p className="px-3 py-1 text-[9px] font-medium text-white/40 uppercase tracking-widest">
+                                Sidebar control
+                            </p>
+                            {OPCIONES_SIDEBAR.map((op) => (
+                                <button
+                                    key={op.value}
+                                    type="button"
+                                    onClick={() => cambiarModoSidebar(op.value)}
+                                    className={
+                                        'w-full text-left px-3 py-2 text-[13px] flex items-center justify-between gap-2 cursor-pointer transition-colors ' +
+                                        (modoSidebar === op.value ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/10')
+                                    }
+                                >
+                                    {op.label}
+                                    {modoSidebar === op.value && <Check className="w-3.5 h-3.5" />}
+                                </button>
+                            ))}
+                        </div>,
+                        document.body
+                    )}
                 </div>
             </aside>
+
+            {/* Tooltip tipo toast para items colapsados */}
+            {tooltip && createPortal(
+                <div
+                    style={{ position: 'fixed', top: tooltip.top, left: tooltip.left, transform: 'translateY(-50%)' }}
+                    className="z-[200] bg-[#0a2030] border border-white/10 rounded-sm shadow-lg px-3 py-1.5 text-[13px] font-medium text-white whitespace-nowrap pointer-events-none animate-fade-in-only"
+                >
+                    {tooltip.label}
+                </div>,
+                document.body
+            )}
 
             <main className="flex-1 h-full overflow-y-auto p-8">
                 <Outlet />
