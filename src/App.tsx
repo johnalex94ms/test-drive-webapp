@@ -1,9 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { supabase } from './lib/supabaseClient';
 import BookingPage from './pages/BookingPage';
 import TrackerPage from './pages/TrackerPage';
 import GestionReservaPage from './pages/GestionReservaPage';
 import LoginAdminPage from './pages/admin/LoginAdminPage';
+import ResetPasswordPage from './pages/admin/ResetPasswordPage';
 import LoginConductorPage from './pages/conductor/LoginConductorPage';
 import ConductorLayout from './pages/conductor/ConductorLayout';
 import ConductorDashboardPage from './pages/conductor/ConductorDashboardPage';
@@ -27,10 +30,26 @@ const queryClient = new QueryClient({
   },
 });
 
+function RecoveryRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/reset-password', { replace: true });
+      }
+    });
+    return () => listener.subscription.unsubscribe();
+  }, [navigate]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <RecoveryRedirect />
         <Routes>
           <Route path="/" element={<BookingPage />} />
           <Route path="/agendar" element={<BookingPage />} />
@@ -38,6 +57,7 @@ export default function App() {
           <Route path="/reserva/:token" element={<GestionReservaPage />} />
 
           <Route path="/admin/login" element={<LoginAdminPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/conductor/login" element={<LoginConductorPage />} />
           <Route path="/conductor" element={<ConductorLayout />}>
             <Route index element={<ConductorDashboardPage />} />
