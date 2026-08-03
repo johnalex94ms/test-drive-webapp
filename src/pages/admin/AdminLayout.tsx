@@ -336,7 +336,7 @@ export default function AdminLayout() {
                 onMouseEnter={() => { if (modoSidebar === 'hover') setHoverActivo(true); }}
                 onMouseLeave={() => { if (modoSidebar === 'hover') setHoverActivo(false); }}
                 className={
-                    'bg-[#051620] flex flex-col justify-between py-6 h-full flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 relative ' +
+                    'bg-gradient-to-b from-[#051620] to-black flex flex-col justify-between py-6 h-full flex-shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-200 relative ' +
                     (expandido ? 'w-56' : 'w-16')
                 }
             >
@@ -395,13 +395,13 @@ export default function AdminLayout() {
                                         onMouseLeave={ocultarTooltip}
                                         onClick={ocultarTooltip}
                                         className={({ isActive }) =>
-                                            'relative rounded-sm text-[13px] font-medium transition-colors flex items-center ' +
+                                            'group relative rounded-sm text-[13px] font-medium transition-colors flex items-center ' +
                                             (expandido ? 'px-3 py-2.5 justify-between' : 'px-0 py-2.5 justify-center') + ' ' +
                                             (isActive ? 'bg-white text-[#051620]' : 'text-white/70 hover:bg-white/10')
                                         }
                                     >
                                         <span className="flex items-center gap-2.5">
-                                            <Icon className="w-4 h-4" />
+                                            <Icon className="nav-icon w-4 h-4" />
                                             {expandido && item.label}
                                         </span>
                                         {badge > 0 && (
@@ -430,13 +430,13 @@ export default function AdminLayout() {
                                         onMouseEnter={(e) => mostrarTooltip(e, item.label)}
                                         onMouseLeave={ocultarTooltip}
                                         className={
-                                            'w-full rounded-sm text-[13px] font-medium transition-colors flex items-center cursor-pointer ' +
+                                            'group w-full rounded-sm text-[13px] font-medium transition-colors flex items-center cursor-pointer ' +
                                             (expandido ? 'px-3 py-2.5 justify-between' : 'px-0 py-2.5 justify-center') + ' ' +
                                             (grupoActivo && !abierto ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/10')
                                         }
                                     >
                                         <span className="flex items-center gap-2.5">
-                                            <GroupIcon className="w-4 h-4" />
+                                            <GroupIcon className="nav-icon w-4 h-4" />
                                             {expandido && item.label}
                                         </span>
                                         {expandido && (
@@ -455,11 +455,11 @@ export default function AdminLayout() {
                                                         to={child.to}
                                                         end
                                                         className={({ isActive }) =>
-                                                            'px-3 py-2 rounded-sm text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
+                                                            'group px-3 py-2 rounded-sm text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
                                                             (isActive ? 'bg-white text-[#051620]' : 'text-white/60 hover:bg-white/10')
                                                         }
                                                     >
-                                                        <ChildIcon className="w-3.5 h-3.5" />
+                                                        <ChildIcon className="nav-icon w-3.5 h-3.5" />
                                                         {child.label}
                                                     </NavLink>
                                                 );
@@ -494,11 +494,11 @@ export default function AdminLayout() {
                                             end
                                             onClick={() => setGruposAbiertos((prev) => ({ ...prev, [grupo.label]: false }))}
                                             className={({ isActive }) =>
-                                                'px-3 py-2 text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
+                                                'group px-3 py-2 text-[13px] font-medium transition-colors flex items-center gap-2.5 ' +
                                                 (isActive ? 'bg-white text-[#051620]' : 'text-white/70 hover:bg-white/10')
                                             }
                                         >
-                                            <ChildIcon className="w-3.5 h-3.5" />
+                                            <ChildIcon className="nav-icon w-3.5 h-3.5" />
                                             {child.label}
                                         </NavLink>
                                     );
@@ -557,9 +557,9 @@ export default function AdminLayout() {
                                 onClick={() => { toggleConfig(); ocultarTooltip(); }}
                                 onMouseEnter={(e) => mostrarTooltip(e, 'Sidebar control')}
                                 onMouseLeave={ocultarTooltip}
-                                className="w-full rounded-sm text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer text-white/60 hover:text-white hover:bg-white/10 px-0 py-2.5"
+                                className="w-full rounded-sm text-[13px] font-light transition-colors flex items-center justify-center gap-2.5 cursor-pointer text-white/60 hover:text-white hover:bg-white/10 px-0 py-2.5"
                             >
-                                <PanelLeftDashed className="w-4 h-4 flex-shrink-0" />
+                                <PanelLeftDashed className="w-5 h-4 flex-shrink-0" />
                             </button>
 
                             <button
@@ -578,7 +578,7 @@ export default function AdminLayout() {
                         <div
                             ref={settingsPopoverRef}
                             style={{ position: 'fixed', bottom: configPos.bottom, left: configPos.left }}
-                            className="z-[200] bg-[#0a2030] border border-white/10 rounded-sm shadow-lg py-1.5 min-w-[200px]"
+                            className="z-[200] bg-[#0a2030] border border-white/10 rounded-sm shadow-lg py-1.5 w-[168px]"
                         >
                             <p className="px-3 py-1 text-[9px] font-medium text-white/40 uppercase tracking-widest">
                                 Sidebar control

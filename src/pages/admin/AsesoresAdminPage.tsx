@@ -345,17 +345,17 @@ export default function AsesoresAdminPage() {
                         <table className="w-full text-sm">
                             <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
                                 <tr>
-                                    <th className="px-4 py-3">Foto</th>
-                                    <th className="px-4 py-3">Nombre</th>
-                                    <th className="px-4 py-3">Sede</th>
-                                    <th className="px-4 py-3">Estado</th>
-                                    <th className="px-4 py-3"></th>
+                                    <th className="px-3 py-2.5">Foto</th>
+                                    <th className="px-3 py-2.5">Nombre</th>
+                                    <th className="px-3 py-2.5">Sede</th>
+                                    <th className="px-3 py-2.5">Estado</th>
+                                    <th className="px-3 py-2.5"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {asesoresPagina.map((a: any) => (
                                     <tr key={a.id} className="border-t border-[#e5e5e5]">
-                                        <td className="px-4 py-3">
+                                        <td className="px-3 py-2.5">
                                             {a.foto_url ? (
                                                 <img src={a.foto_url} alt={a.nombre} className="w-9 h-9 rounded-full object-cover" />
                                             ) : (
@@ -364,29 +364,29 @@ export default function AsesoresAdminPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 font-medium text-[#051620]">{a.nombre}</td>
-                                        <td className="px-4 py-3 text-[#666]">{a.sedes?.nombre || '—'}</td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-3 py-2.5 font-medium text-[#051620]">{a.nombre}</td>
+                                        <td className="px-3 py-2.5 text-[#666]">{a.sedes?.nombre || '—'}</td>
+                                        <td className="px-3 py-2.5">
                                             <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (a.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
                                                 {a.activo ? 'Activo' : 'Inactivo'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
                                             <button
                                                 type="button"
                                                 onClick={() => abrirEditar(a)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                title="Editar"
+                                                className="inline-flex items-center justify-center bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                             >
                                                 <Pencil className="w-3.5 h-3.5" />
-                                                Editar
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setAsesorAEliminar(a)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                                title="Eliminar"
+                                                className="inline-flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors p-1.5 rounded-sm"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
-                                                Eliminar
                                             </button>
                                         </td>
                                     </tr>

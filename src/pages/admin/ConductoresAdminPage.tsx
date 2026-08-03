@@ -427,19 +427,19 @@ export default function ConductoresAdminPage() {
                         <table className="w-full text-sm">
                             <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
                                 <tr>
-                                    <th className="px-4 py-3">Foto</th>
-                                    <th className="px-4 py-3">Nombre</th>
-                                    <th className="px-4 py-3">Correo</th>
-                                    <th className="px-4 py-3">Cargo</th>
-                                    <th className="px-4 py-3">Sedes</th>
-                                    <th className="px-4 py-3">Estado</th>
-                                    <th className="px-4 py-3"></th>
+                                    <th className="px-3 py-2.5">Foto</th>
+                                    <th className="px-3 py-2.5">Nombre</th>
+                                    <th className="px-3 py-2.5">Correo</th>
+                                    <th className="px-3 py-2.5">Cargo</th>
+                                    <th className="px-3 py-2.5">Sedes</th>
+                                    <th className="px-3 py-2.5">Estado</th>
+                                    <th className="px-3 py-2.5"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {conductoresPagina.map((c: any) => (
                                     <tr key={c.id} className="border-t border-[#e5e5e5]">
-                                        <td className="px-4 py-3">
+                                        <td className="px-3 py-2.5">
                                             {c.foto_url ? (
                                                 <img src={c.foto_url} alt={c.nombre} className="w-9 h-9 rounded-full object-cover" />
                                             ) : (
@@ -448,41 +448,41 @@ export default function ConductoresAdminPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 font-medium text-[#051620]">{c.nombre}</td>
-                                        <td className="px-4 py-3 text-[#666]">{c.correo}</td>
-                                        <td className="px-4 py-3 text-[#666]">{c.cargo}</td>
-                                        <td className="px-4 py-3 text-[#666]">
+                                        <td className="px-3 py-2.5 font-medium text-[#051620]">{c.nombre}</td>
+                                        <td className="px-3 py-2.5 text-[#666]">{c.correo}</td>
+                                        <td className="px-3 py-2.5 text-[#666]">{c.cargo}</td>
+                                        <td className="px-3 py-2.5 text-[#666]">
                                             {(c.conductores_sedes || []).map((cs: any) => cs.sedes?.nombre).filter(Boolean).join(', ') || '—'}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-3 py-2.5">
                                             <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (c.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
                                                 {c.activo ? 'Activo' : 'Inactivo'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
                                             <button
                                                 type="button"
                                                 onClick={() => setConductorAResetear(c)}
                                                 title="Restablecer contraseña"
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                className="inline-flex items-center justify-center bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                             >
                                                 <KeyRound className="w-3.5 h-3.5" />
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => abrirEditar(c)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                title="Editar"
+                                                className="inline-flex items-center justify-center bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                             >
                                                 <Pencil className="w-3.5 h-3.5" />
-                                                Editar
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setConductorAEliminar(c)}
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                                title="Eliminar"
+                                                className="inline-flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors p-1.5 rounded-sm"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
-                                                Eliminar
                                             </button>
                                         </td>
                                     </tr>

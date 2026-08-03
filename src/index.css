@@ -81,6 +81,20 @@
   animation: bellRing 0.7s ease-in-out infinite;
 }
 
+@keyframes navIconPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.2); }
+  100% { transform: scale(1.08); }
+}
+
+.nav-icon {
+  transition: transform 0.2s ease-out;
+}
+
+.group:hover .nav-icon {
+  animation: navIconPop 0.35s ease-out forwards;
+}
+
 html {
   scroll-behavior: smooth;
 }

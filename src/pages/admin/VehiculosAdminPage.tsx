@@ -407,16 +407,16 @@ export default function VehiculosAdminPage() {
                         <table className="w-full text-sm">
                             <thead className="bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide">
                                 <tr>
-                                    <th className="px-4 py-3">Modelo</th>
-                                    <th className="px-4 py-3">Version</th>
-                                    <th className="px-4 py-3">Placa</th>
-                                    <th className="px-4 py-3">Categoria</th>
-                                    <th className="px-4 py-3">Sede</th>
-                                    <th className="px-4 py-3">Fotos</th>
-                                    <th className="px-4 py-3">Ingreso</th>
-                                    <th className="px-4 py-3">Pico y placa</th>
-                                    <th className="px-4 py-3">Estado</th>
-                                    <th className="px-4 py-3"></th>
+                                    <th className="px-3 py-2.5">Modelo</th>
+                                    <th className="px-3 py-2.5">Version</th>
+                                    <th className="px-3 py-2.5">Placa</th>
+                                    <th className="px-3 py-2.5">Categoria</th>
+                                    <th className="px-3 py-2.5">Sede</th>
+                                    <th className="px-3 py-2.5">Fotos</th>
+                                    <th className="px-3 py-2.5">Ingreso</th>
+                                    <th className="px-3 py-2.5">Pico y placa</th>
+                                    <th className="px-3 py-2.5">Estado</th>
+                                    <th className="px-3 py-2.5"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -431,18 +431,18 @@ export default function VehiculosAdminPage() {
                                             : undefined;
                                     return (
                                         <tr key={v.id} className="border-t border-[#e5e5e5]">
-                                            <td className="px-4 py-3 font-medium text-[#051620]" style={estiloSombreado}>KIA {v.modelo}</td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.version || '—'}</td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.placa}</td>
-                                            <td className="px-4 py-3 text-[#666] capitalize" style={estiloSombreado}>{v.categoria}</td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>{v.sedes ? v.sedes.nombre : '—'}</td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                            <td className="px-3 py-2.5 font-medium text-[#051620]" style={estiloSombreado}>KIA {v.modelo}</td>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>{v.version || '—'}</td>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>{v.placa}</td>
+                                            <td className="px-3 py-2.5 text-[#666] capitalize" style={estiloSombreado}>{v.categoria}</td>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>{v.sedes ? v.sedes.nombre : '—'}</td>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>
                                                 {v.imagenes_360 && v.imagenes_360.length > 0 ? v.imagenes_360.length + '/4' : '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>
                                                 {v.fecha_ingreso || '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-[#666]" style={estiloSombreado}>
+                                            <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>
                                                 <span className={'inline-flex items-center gap-1.5' + (bloqueadoHoy ? ' text-amber-700 font-medium' : '')}>
                                                     {bloqueadoHoy && <Car className="w-4 h-4" />}
                                                     {diasVehiculo.length > 0
@@ -450,7 +450,7 @@ export default function VehiculosAdminPage() {
                                                         : '—'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3" style={estiloSombreado}>
+                                            <td className="px-3 py-2.5" style={estiloSombreado}>
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className={'text-xs font-medium px-2 py-1 rounded-full ' + (v.activo ? 'bg-green-100 text-green-700' : 'bg-[#f0f0f0] text-[#999]')}>
                                                         {v.activo ? 'Activo' : 'Inactivo'}
@@ -469,29 +469,30 @@ export default function VehiculosAdminPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-right whitespace-nowrap" style={estiloSombreado}>
+                                            <td className="px-3 py-2.5 text-right whitespace-nowrap" style={estiloSombreado}>
                                                 <button
                                                     type="button"
                                                     onClick={() => duplicarVehiculo(v)}
-                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                    title="Duplicar"
+                                                    className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                                 >
                                                     <Copy className="w-3.5 h-3.5" />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => abrirEditar(v)}
-                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm mr-2"
+                                                    title="Editar"
+                                                    className="inline-flex items-center justify-center bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5" />
-                                                    Editar
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setVehiculoAEliminar(v)}
-                                                    className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors px-3 py-1.5 rounded-sm"
+                                                    title="Eliminar"
+                                                    className="inline-flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors p-1.5 rounded-sm"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
-                                                    Eliminar
                                                 </button>
                                             </td>
                                         </tr>

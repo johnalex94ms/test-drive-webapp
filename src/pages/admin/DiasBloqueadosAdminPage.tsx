@@ -25,25 +25,50 @@ function DiaPersonalizado(props: any, diasBloqueados: Record<string, string>, on
     const date = props.date;
     const diaStr = format(date, 'yyyy-MM-dd');
     const bloqueado = !!diasBloqueados[diaStr];
+    const motivo = diasBloqueados[diaStr];
 
     return (
         <button
             type="button"
             onClick={() => onDiaClick(diaStr)}
-            title={bloqueado ? diasBloqueados[diaStr] : 'Click para bloquear este dia'}
+            title={bloqueado ? motivo : 'Click para bloquear este dia'}
             style={{
                 width: '100%',
                 height: '100%',
                 minHeight: 26,
                 background: 'transparent',
                 color: bloqueado ? '#b91c1c' : '#051620',
-                fontSize: 13,
-                fontWeight: bloqueado ? 700 : 600,
                 border: 'none',
                 cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: 2,
+                padding: '2px 2px 4px',
             }}
         >
-            {format(date, 'd')}
+            <span style={{ fontSize: 13, fontWeight: bloqueado ? 700 : 600 }}>
+                {format(date, 'd')}
+            </span>
+            {bloqueado && (
+                <span
+                    style={{
+                        fontSize: 9,
+                        fontWeight: 500,
+                        lineHeight: 1.15,
+                        color: '#b91c1c',
+                        opacity: 0.85,
+                        maxWidth: '100%',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word',
+                        padding: '0 2px',
+                        textAlign: 'center',
+                    }}
+                >
+                    {motivo}
+                </span>
+            )}
         </button>
     );
 }
