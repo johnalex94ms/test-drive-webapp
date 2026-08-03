@@ -89,6 +89,10 @@ export default function DiasBloqueadosAdminPage() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [guardando, setGuardando] = useState(false);
     const [fechaAEliminar, setFechaAEliminar] = useState<any>(null);
+    const [fechaABloquear, setFechaABloquear] = useState<string | null>(null);
+    const [motivoBloqueo, setMotivoBloqueo] = useState('');
+    const [intentoBloquear, setIntentoBloquear] = useState(false);
+    const [intentoAgregarLateral, setIntentoAgregarLateral] = useState(false);
     const queryClient = useQueryClient();
 
     const diasQuery = useQuery({
@@ -105,8 +109,8 @@ export default function DiasBloqueadosAdminPage() {
         diasBloqueados[d.fecha] = d.motivo;
     });
 
-    async function agregarDia(fecha: string, motivoInicial: string) {
-        if (!fecha) return;
+    async function agregarDia(fecha: string, motivo: string) {
+        if (!fecha || !motivo.trim()) return;
         if (diasBloqueados[fecha]) {
             setFechaAEliminar({ fecha, motivo: diasBloqueados[fecha] });
             return;
@@ -115,13 +119,16 @@ export default function DiasBloqueadosAdminPage() {
         setGuardando(true);
         setErrorMsg(null);
         try {
-            const res = await supabase.from('dias_bloqueados').insert({ fecha, motivo: motivoInicial || 'Dia no laboral' });
+            const res = await supabase.from('dias_bloqueados').insert({ fecha, motivo: motivo.trim() });
             if (res.error) throw res.error;
             queryClient.invalidateQueries({ queryKey: ['admin-dias-bloqueados'] });
             setNuevaFecha(hoyISO());
             setNuevoMotivo('');
-        } catch {
-            setErrorMsg('Ocurrio un error al guardar la fecha.');
+            setFechaABloquear(null);
+            setMotivoBloqueo('');
+            setIntentoBloquear(false);
+        } catch (err: any) {
+            setErrorMsg(err && err.code === '23505' ? 'Esa fecha ya esta bloqueada.' : 'Ocurrio un error al guardar la fecha.');
         } finally {
             setGuardando(false);
         }
@@ -145,9 +152,19 @@ export default function DiasBloqueadosAdminPage() {
     function onDiaClickCalendario(diaStr: string) {
         if (diasBloqueados[diaStr]) {
             setFechaAEliminar({ fecha: diaStr, motivo: diasBloqueados[diaStr] });
-        } else {
-            agregarDia(diaStr, 'Festivo');
+            return;
         }
+        if (fechaABloquear === diaStr) return;
+        setErrorMsg(null);
+        setIntentoBloquear(false);
+        setMotivoBloqueo('');
+        setFechaABloquear(diaStr);
+    }
+
+    function confirmarBloqueo() {
+        setIntentoBloquear(true);
+        if (!fechaABloquear || !motivoBloqueo.trim()) return;
+        agregarDia(fechaABloquear, motivoBloqueo);
     }
 
     return (
@@ -205,17 +222,27 @@ export default function DiasBloqueadosAdminPage() {
                                 value={nuevaFecha}
                                 onChange={(e) => setNuevaFecha(e.target.value)}
                             />
-                            <Input
-                                type="text"
-                                placeholder="Motivo (ej. Navidad)"
-                                value={nuevoMotivo}
-                                onChange={(e) => setNuevoMotivo(e.target.value)}
-                                maxLength={60}
-                            />
+                            <div>
+                                <Input
+                                    type="text"
+                                    placeholder="Motivo (ej. Navidad)"
+                                    value={nuevoMotivo}
+                                    onChange={(e) => setNuevoMotivo(e.target.value)}
+                                    maxLength={60}
+                                />
+                                {intentoAgregarLateral && !nuevoMotivo.trim() && (
+                                    <p className="text-xs text-red-600 mt-1">El motivo es obligatorio.</p>
+                                )}
+                            </div>
                             <button
                                 type="button"
                                 disabled={guardando}
-                                onClick={() => agregarDia(nuevaFecha, nuevoMotivo)}
+                                onClick={() => {
+                                    setIntentoAgregarLateral(true);
+                                    if (!nuevoMotivo.trim()) return;
+                                    agregarDia(nuevaFecha, nuevoMotivo);
+                                    setIntentoAgregarLateral(false);
+                                }}
                                 className="bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
                             >
                                 {guardando ? 'Guardando...' : 'Bloquear fecha'}
@@ -287,6 +314,63 @@ export default function DiasBloqueadosAdminPage() {
                                 className="bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-red-700 disabled:opacity-50"
                             >
                                 {guardando ? 'Quitando...' : 'Si, desbloquear'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal bloquear */}
+            {fechaABloquear && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
+                        <div className="flex items-center gap-2.5 mb-2">
+                            <Ban className="w-5 h-5 text-[#051620]" />
+                            <p className="font-display text-lg font-bold text-[#051620]">
+                                Bloquear {fechaABloquear}?
+                            </p>
+                        </div>
+                        <p className="text-sm text-[#666] mb-3">
+                            Este dia quedara sin disponibilidad para agendar test drives.
+                        </p>
+                        <div className="mb-2">
+                            <Input
+                                type="text"
+                                placeholder="Motivo (ej. Navidad)"
+                                value={motivoBloqueo}
+                                onChange={(e) => setMotivoBloqueo(e.target.value)}
+                                maxLength={60}
+                                autoFocus
+                            />
+                            {intentoBloquear && !motivoBloqueo.trim() && (
+                                <p className="text-xs text-red-600 mt-1">El motivo es obligatorio.</p>
+                            )}
+                        </div>
+                        {errorMsg && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-3 py-2 mb-2">
+                                {errorMsg}
+                            </p>
+                        )}
+                        <div className="flex items-center justify-end gap-3 mt-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFechaABloquear(null);
+                                    setMotivoBloqueo('');
+                                    setIntentoBloquear(false);
+                                    setErrorMsg(null);
+                                }}
+                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={guardando}
+                                onClick={confirmarBloqueo}
+                                className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                            >
+                                {guardando ? 'Guardando...' : 'Si, bloquear'}
                             </button>
                         </div>
                     </div>

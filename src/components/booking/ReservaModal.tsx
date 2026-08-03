@@ -1,8 +1,10 @@
-﻿import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+﻿import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, Mail, Phone, IdCard, MessageSquare, Upload, X, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { asignarConductorDisponible } from '../../lib/asignarConductor';
+import { asignarVehiculoDisponible, vehiculosDisponiblesEseDia } from '../../lib/asignarVehiculo';
+import type { DiaPicoPlaca } from '../../lib/picoPlaca';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
@@ -27,14 +29,18 @@ function fotoConductor(nombre: string) {
 
 interface ReservaModalProps {
   vehiculo: any;
+  vehiculosPool?: any[];
+  vehiculosSede?: any[];
   zona: any;
   fecha: string;
   onClose: () => void;
   onSuccess: (id: string) => void;
+  variant?: 'modal' | 'panel';
 }
 
-export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: ReservaModalProps) {
+export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fecha, onClose, onSuccess, variant = 'modal' }: ReservaModalProps) {
   const [horaSel, setHoraSel] = useState<string | null>(null);
+  const [conducidoPorAsesor, setConducidoPorAsesor] = useState(false);
   const [asesorId, setAsesorId] = useState('');
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
@@ -73,6 +79,24 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
 
   const asesores = asesoresQuery.data || [];
 
+  const pool = vehiculosPool && vehiculosPool.length > 0 ? vehiculosPool : [vehiculo];
+  const poolSede = vehiculosSede && vehiculosSede.length > 0 ? vehiculosSede : pool;
+
+  const picoPlacaConfigQuery = useQuery({
+    queryKey: ['pico-placa-config'],
+    queryFn: async () => {
+      const res = await supabase.from('pico_placa_config').select('*').order('dia_semana');
+      return (res.data || []) as DiaPicoPlaca[];
+    },
+  });
+
+  // Disponibilidad de horas: es la misma para toda la sede, sin importar el modelo elegido
+  const poolSedeDelDia = vehiculosDisponiblesEseDia(poolSede, fecha, picoPlacaConfigQuery.data || []);
+  const poolSedeDelDiaIds = poolSedeDelDia.map((v: any) => v.id);
+
+  // Asignacion final del vehiculo especifico: debe ser del MISMO modelo elegido
+  const poolModeloDelDia = vehiculosDisponiblesEseDia(pool, fecha, picoPlacaConfigQuery.data || []);
+
   const conductorQuery = useQuery({
     queryKey: ['conductor-disponible', vehiculo.sede_id, fecha, horaSel],
     enabled: !!horaSel,
@@ -85,21 +109,54 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
   });
 
   const ocupadosQuery = useQuery({
-    queryKey: ['ocupados-dia', vehiculo.id, fecha],
+    queryKey: ['ocupados-dia', poolSedeDelDiaIds.slice().sort().join(','), fecha],
+    enabled: poolSedeDelDiaIds.length > 0,
     queryFn: async () => {
       const res = await supabase
         .from('reservas')
-        .select('hora_inicio')
-        .eq('vehiculo_id', vehiculo.id)
+        .select('hora_inicio, vehiculo_id')
+        .in('vehiculo_id', poolSedeDelDiaIds)
         .eq('fecha', fecha)
-        .in('estado', ['pendiente', 'confirmada', 'en_camino', 'en_prueba']);
-      return (res.data || []).map((r: any) => r.hora_inicio);
+        .in('estado', ['confirmada', 'en_camino', 'en_prueba']);
+      return res.data || [];
     },
   });
 
+  const queryClient = useQueryClient();
+  const poolSedeDelDiaKey = poolSedeDelDiaIds.slice().sort().join(',');
+
+  useEffect(() => {
+    if (poolSedeDelDiaIds.length === 0) return;
+
+    const canal = supabase
+      .channel('reserva-modal-' + poolSedeDelDiaKey + '-' + fecha)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservas' },
+        (payload: any) => {
+          const idAfectado = (payload.new && payload.new.vehiculo_id) || (payload.old && payload.old.vehiculo_id);
+          if (idAfectado && !poolSedeDelDiaIds.includes(idAfectado)) return;
+          queryClient.invalidateQueries({ queryKey: ['ocupados-dia'] });
+          queryClient.invalidateQueries({ queryKey: ['conductor-disponible'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [poolSedeDelDiaKey, fecha, queryClient]);
+
   const ocupados = ocupadosQuery.data || [];
+  const conteoPorHora: Record<string, number> = {};
+  ocupados.forEach((r: any) => {
+    const h = r.hora_inicio.slice(0, 5);
+    conteoPorHora[h] = (conteoPorHora[h] || 0) + 1;
+  });
   const horariosDelDia = obtenerHorariosDelDia(fecha);
-  const disponibles = horariosDelDia.filter((h) => !ocupados.includes(h + ':00'));
+  const disponibles = poolSedeDelDiaIds.length === 0
+    ? []
+    : horariosDelDia.filter((h) => (conteoPorHora[h] || 0) < poolSedeDelDiaIds.length);
 
   const sede = sedeQuery.data;
   const ciudad = (zona && zona.municipio) || (sede && sede.ciudad) || '';
@@ -164,6 +221,10 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
       setErrorMsg('Selecciona el asesor encargado de la prueba.');
       return;
     }
+    if (!conductorQuery.data && !conducidoPorAsesor) {
+      setErrorMsg('No hay conductor disponible a esa hora. Marca la casilla para hacer tu la prueba de ruta.');
+      return;
+    }
     if (!nombres || !apellidos || !numeroDocumento || !correo || !celular) {
       setErrorMsg('Faltan campos por completar, revisa los marcados en rojo.');
       return;
@@ -202,13 +263,21 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
 
       const conductor = conductorQuery.data;
 
+      const vehiculoAsignadoId = await asignarVehiculoDisponible(poolModeloDelDia, fecha, horaSel + ':00');
+      if (!vehiculoAsignadoId) {
+        setErrorMsg('Ese horario ya fue reservado. Elige otro.');
+        setEnviando(false);
+        return;
+      }
+
       const insertResult = await supabase
         .from('reservas')
         .insert({
-          vehiculo_id: vehiculo.id,
+          vehiculo_id: vehiculoAsignadoId,
           sede_id: vehiculo.sede_id,
           asesor_id: asesorId,
           conductor_id: conductor ? conductor.id : null,
+          conducido_por_asesor: !conductor && conducidoPorAsesor,
           zona_id: (zona.id === 'domicilio' || zona.id === 'sede') ? null : zona.id,
           cliente_nombre: nombres,
           cliente_apellido: apellidos,
@@ -224,7 +293,7 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
           fecha: fecha,
           hora_inicio: horaSel,
           hora_fin: calcularHoraFin(horaSel),
-          estado: 'pendiente',
+          estado: 'confirmada',
         })
         .select()
         .single();
@@ -245,274 +314,312 @@ export function ReservaModal({ vehiculo, zona, fecha, onClose, onSuccess }: Rese
 
   const conductor = conductorQuery.data;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-sm max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+  const encabezado = (
+    <div className="px-5 py-3 border-b border-[#e5e5e5] flex items-center justify-between flex-shrink-0">
+      <div>
+        <p className="text-xs text-[#666]">KIA {vehiculo.modelo}</p>
+        <p className="font-display text-xl font-bold text-[#051620]">{fecha}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="text-[#666] hover:text-[#051620] cursor-pointer"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    </div>
+  );
 
-        <div className="px-5 py-3 border-b border-[#e5e5e5] flex items-center justify-between">
-          <div>
-            <p className="text-xs text-[#666]">KIA {vehiculo.modelo}</p>
-            <p className="font-display text-xl font-bold text-[#051620]">{fecha}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[#666] hover:text-[#051620] cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  const pie = (
+    <div className="px-6 py-4 border-t border-[#e5e5e5] flex-shrink-0">
+      <Button
+        onClick={confirmar}
+        variant="primary"
+        size="lg"
+        loading={enviando}
+        disabled={enviando}
+        className="w-full"
+      >
+        Confirmar reserva
+      </Button>
+    </div>
+  );
 
-        <div className="p-6 grid md:grid-cols-2 gap-8">
+  const cuerpo = (
+    <div className={variant === 'panel' ? 'p-6 flex flex-col gap-8' : 'p-6 grid md:grid-cols-2 gap-8'}>
 
-          {/* Columna izquierda: horario + conductor + ubicacion */}
-          <div>
-            <div className="grid grid-cols-2 gap-4 mb-6 items-stretch">
-              <div className="flex flex-col">
-                <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
-                  Horario
-                </p>
-                {ocupadosQuery.isLoading ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className="h-9 bg-[#e5e5e5] rounded-sm animate-pulse" />
-                    ))}
-                  </div>
-                ) : disponibles.length === 0 ? (
-                  <p className="text-sm text-[#666] bg-[#f8f8f8] rounded-sm p-3">
-                    Sin horarios este dia.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {disponibles.map((h) => {
-                      const activo = horaSel === h;
-                      return (
-                        <button
-                          key={h}
-                          type="button"
-                          onClick={() => setHoraSel(h)}
-                          className={
-                            'px-3 py-2 text-sm font-medium rounded-sm border cursor-pointer transition-all ' +
-                            (activo
-                              ? 'bg-[#051620] text-white border-[#051620]'
-                              : 'bg-white border-[#e5e5e5] text-[#051620] hover:border-[#051620]')
-                          }
-                        >
-                          {h}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col">
-                <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
-                  Conductor asignadoa
-                </p>
-                <div className="flex-1 flex flex-col justify-end">
-                  {!horaSel ? (
-                    <p className="text-sm text-[#666]">
-                      Selecciona un horario.
-                    </p>
-                  ) : conductorQuery.isLoading ? (
-                    <div className="h-16 bg-[#f8f8f8] rounded-sm animate-pulse" />
-                  ) : conductor ? (
-                    <div className="flex items-center gap-2.5 bg-[#f8f8f8] rounded-sm p-3 h-full">
-                      <img
-                        src={conductor.foto_url || fotoConductor(conductor.nombre)}
-                        alt={conductor.nombre}
-                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-xs text-[#051620] truncate">{conductor.nombre}</p>
-                        <p className="text-xs text-[#666] truncate">{conductor.cargo}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[#666]">
-                      Todos los expertos estan ocupados en ese horario.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
+      {/* Columna izquierda: horario + conductor + ubicacion */}
+      <div>
+        <div className="flex flex-col gap-4 mb-2">
+          <div className="flex flex-col">
             <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
-              Ubicacion de la prueba
+              Horario
             </p>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="bg-[#f8f8f8] rounded-sm p-3">
-                <p className="text-xs text-[#666]">Ciudad</p>
-                <p className="text-sm font-medium text-[#051620]">{ciudad || '—'}</p>
+            {ocupadosQuery.isLoading ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-9 bg-[#e5e5e5] rounded-sm animate-pulse" />
+                ))}
               </div>
-              <div className="bg-[#f8f8f8] rounded-sm p-3">
-                <p className="text-xs text-[#666]">Concesionario</p>
-                <p className="text-sm font-medium text-[#051620]">{sede ? sede.nombre : '—'}</p>
-              </div>
-            </div>
-
-            <label
-              htmlFor="licencia-modal"
-              className="border border-dashed border-[#e5e5e5] rounded-sm p-4 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-[#051620] transition-colors bg-[#f8f8f8] mb-6"
-            >
-              {licenciaPreview ? (
-                <img src={licenciaPreview} alt="Licencia" className="h-20 object-contain rounded" />
-              ) : (
-                <div className="text-center flex flex-col items-center gap-1.5">
-                  <Upload className="w-5 h-5 text-[#999]" />
-                  <p className="text-sm text-[#666]">Sube la licencia de conducir de tu cliente</p>
-                  <p className="text-xs text-[#aaa]">JPG, PNG, maximo 5MB</p>
-                </div>
-              )}
-            </label>
-            <input
-              id="licencia-modal"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleLicencia}
-            />
-
-            {errorMsg && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3">
-                {errorMsg}
+            ) : disponibles.length === 0 ? (
+              <p className="text-sm text-[#666] bg-[#f8f8f8] rounded-sm p-3">
+                Sin horarios este dia.
               </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {disponibles.map((h) => {
+                  const activo = horaSel === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => { setHoraSel(h); setConducidoPorAsesor(false); }}
+                      className={
+                        'px-3 py-2 text-sm font-medium rounded-sm border cursor-pointer transition-all ' +
+                        (activo
+                          ? 'bg-[#051620] text-white border-[#051620]'
+                          : 'bg-white border-[#e5e5e5] text-[#051620] hover:border-[#051620]')
+                      }
+                    >
+                      {h}
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {/* Columna derecha: asesor + formulario */}
-          <div>
+          <div className="flex flex-col">
             <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
-              Asesor encargado
+              Conductor asignado
             </p>
-            <div className="relative mb-4">
-              <UserRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#999] pointer-events-none" />
-              <select
-                value={asesorId}
-                onChange={(e) => setAsesorId(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
-                style={{
-                  backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
-                  backgroundPosition: 'right 14px center',
-                }}
-              >
-                <option value="">
-                  {asesoresQuery.isLoading ? 'Cargando asesores...' : 'Selecciona el asesor'}
-                </option>
-                {asesores.map((a: any) => (
-                  <option key={a.id} value={a.id}>{a.nombre}</option>
-                ))}
-              </select>
-              {intentoEnviar && !asesorId && (
-                <p className="text-xs text-red-600 mt-1">Requerido</p>
-              )}
-              {!asesoresQuery.isLoading && asesores.length === 0 && (
-                <p className="text-xs text-amber-700 mt-1">
-                  No hay asesores activos en esta sede. Agrega uno en el panel admin.
+            <div className="flex flex-col">
+              {!horaSel ? (
+                <p className="text-sm text-[#666]">
+                  Selecciona un horario.
                 </p>
+              ) : conductorQuery.isLoading ? (
+                <div className="h-16 bg-[#f8f8f8] rounded-sm animate-pulse" />
+              ) : conductor ? (
+                <div className="flex items-center gap-2.5 bg-[#f8f8f8] rounded-sm p-3 h-full">
+                  <img
+                    src={conductor.foto_url || fotoConductor(conductor.nombre)}
+                    alt={conductor.nombre}
+                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-xs text-[#051620] truncate">{conductor.nombre}</p>
+                    <p className="text-xs text-[#666] truncate">{conductor.cargo}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-100 rounded-sm p-3">
+                  <p className="text-xs text-amber-800 mb-2">
+                    Todos los expertos estan ocupados en ese horario.
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={conducidoPorAsesor}
+                      onChange={(e) => setConducidoPorAsesor(e.target.checked)}
+                      className="mt-0.5 cursor-pointer"
+                    />
+                    <span className="text-xs text-amber-900 font-medium">
+                      Esta prueba de ruta sera realizada por ti como asesor comercial y quedara asignada a ti.
+                    </span>
+                  </label>
+                </div>
               )}
             </div>
+          </div>
+        </div>
 
-            <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
-              Datos de tu cliente
+        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+          Ubicacion de la prueba
+        </p>
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-[#f8f8f8] rounded-sm p-3">
+            <p className="text-xs text-[#666]">Ciudad</p>
+            <p className="text-sm font-medium text-[#051620]">{ciudad || '—'}</p>
+          </div>
+          <div className="bg-[#f8f8f8] rounded-sm p-3">
+            <p className="text-xs text-[#666]">Concesionario</p>
+            <p className="text-sm font-medium text-[#051620]">{sede ? sede.nombre : '—'}</p>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3">
+            {errorMsg}
+          </p>
+        )}
+      </div>
+
+      {/* Columna derecha: asesor + formulario */}
+      <div>
+        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+          Asesor encargado
+        </p>
+        <div className="relative mb-4">
+          <UserRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#999] pointer-events-none" />
+          <select
+            value={asesorId}
+            onChange={(e) => setAsesorId(e.target.value)}
+            className="w-full pl-10 pr-10 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+            style={{
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+              backgroundPosition: 'right 14px center',
+            }}
+          >
+            <option value="">
+              {asesoresQuery.isLoading ? 'Cargando asesores...' : 'Selecciona el asesor'}
+            </option>
+            {asesores.map((a: any) => (
+              <option key={a.id} value={a.id}>{a.nombre}</option>
+            ))}
+          </select>
+          {intentoEnviar && !asesorId && (
+            <p className="text-xs text-red-600 mt-1">Requerido</p>
+          )}
+          {!asesoresQuery.isLoading && asesores.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">
+              No hay asesores activos en esta sede. Agrega uno en el panel admin.
             </p>
-            <div className="flex flex-col gap-3 mb-4">
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  icon={User}
-                  placeholder="Nombres"
-                  value={nombres}
-                  onChange={(e) => setNombres(e.target.value)}
-                  error={intentoEnviar && !nombres ? 'Requerido' : undefined}
-                />
-                <Input
-                  icon={User}
-                  placeholder="Apellidos"
-                  value={apellidos}
-                  onChange={(e) => setApellidos(e.target.value)}
-                  error={intentoEnviar && !apellidos ? 'Requerido' : undefined}
-                />
-              </div>
+          )}
+        </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={tipoDocumento}
-                  onChange={(e) => setTipoDocumento(e.target.value)}
-                  className="w-full pl-4 pr-10 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
-                  style={{
-                    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
-                    backgroundPosition: 'right 14px center',
-                  }}
-                >
-                  {TIPOS_DOCUMENTO.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-                <Input
-                  icon={IdCard}
-                  placeholder="Numero de documento"
-                  inputMode="numeric"
-                  value={numeroDocumento}
-                  onChange={(e) => handleNumeroDocumento(e.target.value)}
-                  error={errorDocumento}
-                />
-              </div>
-
-              <Input
-                icon={Mail}
-                placeholder="Correo electronico"
-                type="email"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                error={errorCorreo}
-              />
-              <Input
-                icon={Phone}
-                placeholder="Celular"
-                inputMode="numeric"
-                value={celular}
-                onChange={(e) => handleCelular(e.target.value)}
-                error={errorCelular}
-              />
-
-              <div className="relative">
-                <MessageSquare className="absolute left-3.5 top-3.5 w-4 h-4 text-[#999]" />
-                <textarea
-                  placeholder="Comentario (opcional)"
-                  value={comentario}
-                  onChange={(e) => setComentario(e.target.value)}
-                  rows={3}
-                  className="w-full pl-10 pr-4 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] placeholder:text-[#aaa] focus:border-[#051620] focus:ring-2 focus:ring-[#051620]/20 resize-none transition-colors"
-                />
-              </div>
-
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={aceptaTerminos}
-                  onChange={(e) => setAceptaTerminos(e.target.checked)}
-                  className="mt-0.5 cursor-pointer"
-                />
-                <span className="text-xs text-[#666]">
-                  Tu cliente autoriza a Distrikia el manejo de sus datos personales de acuerdo con las politicas de tratamiento de informacion.
-                </span>
-              </label>
-            </div>
-
-            <Button
-              onClick={confirmar}
-              variant="primary"
-              size="lg"
-              loading={enviando}
-              disabled={enviando}
-              className="w-full"
-            >
-              Confirmar reserva
-            </Button>
+        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+          Datos de tu cliente
+        </p>
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              icon={User}
+              placeholder="Nombres"
+              value={nombres}
+              onChange={(e) => setNombres(e.target.value)}
+              error={intentoEnviar && !nombres ? 'Requerido' : undefined}
+            />
+            <Input
+              icon={User}
+              placeholder="Apellidos"
+              value={apellidos}
+              onChange={(e) => setApellidos(e.target.value)}
+              error={intentoEnviar && !apellidos ? 'Requerido' : undefined}
+            />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={tipoDocumento}
+              onChange={(e) => setTipoDocumento(e.target.value)}
+              className="w-full pl-4 pr-10 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] focus:border-[#051620] appearance-none bg-white bg-no-repeat"
+              style={{
+                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+                backgroundPosition: 'right 14px center',
+              }}
+            >
+              {TIPOS_DOCUMENTO.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <Input
+              icon={IdCard}
+              placeholder="Numero de documento"
+              inputMode="numeric"
+              value={numeroDocumento}
+              onChange={(e) => handleNumeroDocumento(e.target.value)}
+              error={errorDocumento}
+            />
+          </div>
+
+          <Input
+            icon={Mail}
+            placeholder="Correo electronico"
+            type="email"
+            value={correo}
+            onChange={(e) => setCorreo(e.target.value)}
+            error={errorCorreo}
+          />
+          <Input
+            icon={Phone}
+            placeholder="Celular"
+            inputMode="numeric"
+            value={celular}
+            onChange={(e) => handleCelular(e.target.value)}
+            error={errorCelular}
+          />
+
+          <div className="relative">
+            <MessageSquare className="absolute left-3.5 top-3.5 w-4 h-4 text-[#999]" />
+            <textarea
+              placeholder="Comentario (opcional)"
+              value={comentario}
+              onChange={(e) => setComentario(e.target.value)}
+              rows={3}
+              className="w-full pl-10 pr-4 py-3 text-sm border border-[#e5e5e5] rounded-sm outline-none text-[#051620] placeholder:text-[#aaa] focus:border-[#051620] focus:ring-2 focus:ring-[#051620]/20 resize-none transition-colors"
+            />
+          </div>
+
+          <label
+            htmlFor="licencia-modal"
+            className="border border-dashed border-[#e5e5e5] rounded-sm p-4 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-[#051620] transition-colors bg-[#f8f8f8]"
+          >
+            {licenciaPreview ? (
+              <img src={licenciaPreview} alt="Licencia" className="h-20 object-contain rounded" />
+            ) : (
+              <div className="text-center flex flex-col items-center gap-1.5">
+                <Upload className="w-5 h-5 text-[#999]" />
+                <p className="text-sm text-[#666]">Sube la licencia de conducir de tu cliente</p>
+                <p className="text-xs text-[#aaa]">JPG, PNG, maximo 5MB</p>
+              </div>
+            )}
+          </label>
+          <input
+            id="licencia-modal"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLicencia}
+          />
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={aceptaTerminos}
+              onChange={(e) => setAceptaTerminos(e.target.checked)}
+              className="mt-0.5 cursor-pointer"
+            />
+            <span className="text-xs text-[#666]">
+              Tu cliente autoriza a Distrikia el manejo de sus datos personales de acuerdo con las politicas de tratamiento de informacion.
+            </span>
+          </label>
         </div>
+      </div>
+
+    </div>
+  );
+
+  if (variant === 'panel') {
+    return (
+      <div className="h-full flex flex-col">
+        {encabezado}
+        <div className="flex-1 overflow-y-auto scroll-fino">
+          {cuerpo}
+        </div>
+        {pie}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-sm max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        {encabezado}
+        <div className="flex-1 overflow-y-auto scroll-fino">
+          {cuerpo}
+        </div>
+        {pie}
       </div>
     </div>
   );

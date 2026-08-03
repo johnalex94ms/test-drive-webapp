@@ -23,7 +23,9 @@
 
 .rbc-row-content .rbc-date-cell,
 .rbc-row-content .rbc-date-cell button,
-.rbc-row-content .rbc-show-more {
+.rbc-row-content .rbc-show-more,
+.rbc-row-content .rbc-event,
+.rbc-row-content .rbc-event * {
     pointer-events: auto;
 }
 

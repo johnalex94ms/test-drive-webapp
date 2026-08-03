@@ -6,7 +6,6 @@ import { Copy, ExternalLink, X } from 'lucide-react';
 const SITE_URL = 'http://localhost:5173';
 
 const TABS = [
-    { key: 'pendiente', label: 'Pendientes' },
     { key: 'confirmada', label: 'Confirmadas' },
     { key: 'en_camino', label: 'En camino' },
     { key: 'en_prueba', label: 'En prueba' },
@@ -32,10 +31,9 @@ function siguienteEstado(reserva: any) {
 }
 
 export default function ReservasAdminPage() {
-    const [tab, setTab] = useState('pendiente');
+    const [tab, setTab] = useState('confirmada');
     const [seleccionada, setSeleccionada] = useState<any>(null);
-    const [accion, setAccion] = useState<'aprobar' | 'rechazar' | 'cancelar' | null>(null);
-    const [motivoRechazo, setMotivoRechazo] = useState('');
+    const [accion, setAccion] = useState<'cancelar' | null>(null);
     const [procesando, setProcesando] = useState(false);
     const [licenciaAmpliada, setLicenciaAmpliada] = useState(false);
     const [motivoCancelacion, setMotivoCancelacion] = useState('');
@@ -64,7 +62,7 @@ export default function ReservasAdminPage() {
         queryFn: async () => {
             const res = await supabase
                 .from('reservas')
-                .select('*, vehiculos(*), conductores(*), sedes(*)')
+                .select('*, vehiculos(*), conductores(*), sedes(*), asesores(nombre, foto_url)')
                 .eq('estado', tab)
                 .order('fecha', { ascending: true });
             return res.data || [];
@@ -112,7 +110,6 @@ export default function ReservasAdminPage() {
         setProcesando(false);
         setSeleccionada(null);
         setAccion(null);
-        setMotivoRechazo('');
     }
 
     function abrirCancelar() {
@@ -164,7 +161,7 @@ export default function ReservasAdminPage() {
         <div>
             <div className="mb-6">
                 <h1 className="font-display text-2xl font-bold text-[#051620]">Reservas</h1>
-                <p className="text-sm text-[#666]">Revisa, aprueba y da seguimiento a las pruebas de ruta.</p>
+                <p className="text-sm text-[#666]">Da seguimiento a las pruebas de ruta.</p>
             </div>
 
             <div className="flex gap-2 flex-wrap mb-6">
@@ -321,7 +318,7 @@ export default function ReservasAdminPage() {
                                     )}
                                     <div>
                                         <div className="flex items-center justify-between">
-                                            <p><strong>Conductor:</strong> {seleccionada.conductores ? seleccionada.conductores.nombre : 'Sin asignar'}</p>
+                                            <p><strong>Conductor:</strong> {seleccionada.conductores ? seleccionada.conductores.nombre : (seleccionada.conducido_por_asesor ? 'La hace el asesor: ' + (seleccionada.asesores ? seleccionada.asesores.nombre : 'Sin dato') : 'Sin asignar')}</p>
                                             {['confirmada', 'en_camino', 'en_prueba'].includes(seleccionada.estado) && (
                                                 <button
                                                     type="button"
@@ -398,25 +395,6 @@ export default function ReservasAdminPage() {
                         </div>
 
                         <div className="p-5 border-t border-[#e5e5e5] flex items-center justify-between gap-3">
-                            {seleccionada.estado === 'pendiente' && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAccion('rechazar')}
-                                        className="text-sm text-red-600 hover:underline cursor-pointer"
-                                    >
-                                        Rechazar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAccion('aprobar')}
-                                        className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030]"
-                                    >
-                                        Aprobar reserva
-                                    </button>
-                                </>
-                            )}
-
                             {['confirmada', 'en_camino', 'en_prueba'].includes(seleccionada.estado) && (
                                 <button
                                     type="button"
@@ -436,82 +414,6 @@ export default function ReservasAdminPage() {
                                     {siguienteEstado(seleccionada)?.label}
                                 </button>
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de confirmacion — Aprobar */}
-            {seleccionada && accion === 'aprobar' && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
-                        <p className="font-display text-lg font-bold text-[#051620] mb-2">
-                            Aprobar esta reserva?
-                        </p>
-                        <p className="text-sm text-[#666] mb-6">
-                            {seleccionada.cliente_nombre} vera en su seguimiento que la prueba fue confirmada.
-                        </p>
-                        <div className="flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setAccion(null)}
-                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                disabled={procesando}
-                                onClick={() => actualizarEstado(seleccionada.id, 'confirmada')}
-                                className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
-                            >
-                                {procesando ? 'Aprobando...' : 'Si, aprobar'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de confirmacion — Rechazar */}
-            {seleccionada && accion === 'rechazar' && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
-                        <p className="font-display text-lg font-bold text-[#051620] mb-2">
-                            Rechazar esta reserva?
-                        </p>
-                        <p className="text-sm text-[#666] mb-3">
-                            El cliente vera este motivo en su correo, es obligatorio explicarle por que.
-                        </p>
-                        <textarea
-                            value={motivoRechazo}
-                            onChange={(e) => setMotivoRechazo(e.target.value)}
-                            placeholder="Ej: la licencia no es legible, por favor sube una nueva foto."
-                            rows={3}
-                            className={
-                                'w-full px-3 py-2.5 text-sm border rounded-sm outline-none text-[#051620] placeholder:text-[#aaa] resize-none mb-1 ' +
-                                (motivoRechazo.trim() === '' ? 'border-[#e5e5e5] focus:border-[#051620]' : 'border-[#051620]')
-                            }
-                        />
-                        {motivoRechazo.trim() === '' && (
-                            <p className="text-xs text-red-600 mb-4">Debes explicar el motivo antes de rechazar.</p>
-                        )}
-                        {motivoRechazo.trim() !== '' && <div className="mb-4" />}
-                        <div className="flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setAccion(null)}
-                                className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                disabled={procesando || motivoRechazo.trim() === ''}
-                                onClick={() => actualizarEstado(seleccionada.id, 'rechazada', motivoRechazo)}
-                                className="bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {procesando ? 'Rechazando...' : 'Si, rechazar'}
-                            </button>
                         </div>
                     </div>
                 </div>

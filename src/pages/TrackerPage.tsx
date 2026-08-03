@@ -85,17 +85,15 @@ export default function TrackerPage() {
     const esDomicilio = reserva.tipo_entrega === 'domicilio';
     const cancelada = reserva.estado === 'cancelada';
     const rechazada = reserva.estado === 'rechazada';
-    const pendiente = reserva.estado === 'pendiente';
     const conductor = reserva.conductores;
     const vehiculo = reserva.vehiculos;
     const sede = reserva.sedes;
 
     const pasosBase = esDomicilio
-        ? ['revision', 'confirmada', 'en_camino', 'en_prueba', 'finalizada']
-        : ['revision', 'confirmada', 'en_prueba', 'finalizada'];
+        ? ['confirmada', 'en_camino', 'en_prueba', 'finalizada']
+        : ['confirmada', 'en_prueba', 'finalizada'];
 
     function estaCompletado(paso: string) {
-        if (paso === 'revision') return reserva.estado !== 'pendiente';
         if (paso === 'confirmada') return ['confirmada', 'en_camino', 'en_prueba', 'finalizada'].includes(reserva.estado);
         if (paso === 'en_camino') return ['en_prueba', 'finalizada'].includes(reserva.estado);
         if (paso === 'en_prueba') return reserva.estado === 'finalizada';
@@ -104,7 +102,6 @@ export default function TrackerPage() {
     }
 
     function estaActivo(paso: string) {
-        if (paso === 'revision') return reserva.estado === 'pendiente';
         if (paso === 'confirmada') return reserva.estado === 'confirmada';
         if (paso === 'en_camino') return reserva.estado === 'en_camino';
         if (paso === 'en_prueba') return reserva.estado === 'en_prueba';
@@ -112,7 +109,6 @@ export default function TrackerPage() {
     }
 
     const ETIQUETAS: Record<string, { titulo: string; sub: string }> = {
-        revision: { titulo: 'En revision', sub: 'Estamos validando tus datos' },
         confirmada: { titulo: 'Reserva confirmada', sub: conductor ? 'Con ' + conductor.nombre : 'Te asignaremos un experto' },
         en_camino: { titulo: 'En camino a tu ubicacion', sub: 'El KIA va hacia ti' },
         en_prueba: { titulo: 'Prueba de ruta', sub: 'Disfruta tu experiencia' },
@@ -149,14 +145,6 @@ export default function TrackerPage() {
                         </p>
                         <p className="text-sm text-[#666]">
                             {reserva.motivo_rechazo || 'Contactanos para mas informacion.'}
-                        </p>
-                    </div>
-                )}
-
-                {pendiente && (
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6">
-                        <p className="text-sm text-[#666]">
-                            Estamos revisando tus datos y tu licencia de conducir. Esto puede tardar unos minutos, te avisaremos por correo.
                         </p>
                     </div>
                 )}
@@ -203,7 +191,7 @@ export default function TrackerPage() {
                     </div>
                 )}
 
-                {conductor && !cancelada && !rechazada && !pendiente && (
+                {conductor && !cancelada && !rechazada && (
                     <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 flex items-center gap-3 mb-6">
                         <img
                             src={conductor.foto_url || fotoConductor(conductor.nombre)}
@@ -221,6 +209,14 @@ export default function TrackerPage() {
                         >
                             <Phone className="w-4 h-4 text-white" />
                         </button>
+                    </div>
+                )}
+
+                {!conductor && reserva.conducido_por_asesor && !cancelada && !rechazada && (
+                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6">
+                        <p className="text-sm text-[#666]">
+                            Tu asesor comercial te acompañara directamente en esta prueba de ruta.
+                        </p>
                     </div>
                 )}
 

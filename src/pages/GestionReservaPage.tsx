@@ -201,8 +201,6 @@ export default function GestionReservaPage() {
             if (documentoCambio) {
                 payload.numero_documento = numeroDocEditado.trim();
                 payload.licencia_url = licenciaUrl;
-                payload.estado = 'pendiente';
-                payload.conductor_id = null;
             }
 
             const res = await supabase.from('reservas').update(payload).eq('id', reserva.id);

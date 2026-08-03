@@ -95,6 +95,42 @@
   animation: navIconPop 0.35s ease-out forwards;
 }
 
+@keyframes slideInRight {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 280ms ease-out;
+}
+
+.scroll-fino {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d4 transparent;
+}
+
+.scroll-fino::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-fino::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-fino::-webkit-scrollbar-thumb {
+  background-color: #d4d4d4;
+  border-radius: 999px;
+}
+
+.scroll-fino::-webkit-scrollbar-thumb:hover {
+  background-color: #b5b5b5;
+}
+
 html {
   scroll-behavior: smooth;
 }

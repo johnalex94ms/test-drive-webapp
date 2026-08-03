@@ -14,6 +14,7 @@ interface BookingStore {
     paso: 1 | 2 | 3 | 4;
     modelo: string | null;
     vehiculo: Vehiculo | null;
+    vehiculosPool: Vehiculo[];
     sedeSeleccionada: any | null;
     zona: Zona | null;
     slot: SlotDisponible | null;
@@ -22,6 +23,7 @@ interface BookingStore {
     setPaso: (paso: 1 | 2 | 3 | 4) => void;
     setModelo: (m: string | null) => void;
     setVehiculo: (v: Vehiculo | null) => void;
+    setVehiculosPool: (v: Vehiculo[]) => void;
     setSedeSeleccionada: (s: any | null) => void;
     setZona: (z: Zona | null) => void;
     setSlot: (s: SlotDisponible | null) => void;
@@ -42,17 +44,19 @@ export const useBookingStore = create<BookingStore>((set) => ({
     paso: 1,
     modelo: null,
     vehiculo: null,
+    vehiculosPool: [],
     sedeSeleccionada: null,
     zona: null,
     slot: null,
     cliente: clienteInicial,
 
     setPaso: (paso) => set({ paso }),
-    setModelo: (modelo) => set({ modelo, vehiculo: null, sedeSeleccionada: null, zona: null, slot: null }),
+    setModelo: (modelo) => set({ modelo, vehiculo: null, vehiculosPool: [], sedeSeleccionada: null, zona: null, slot: null }),
     setVehiculo: (vehiculo) => set({ vehiculo, zona: null, slot: null }),
+    setVehiculosPool: (vehiculosPool) => set({ vehiculosPool }),
     setSedeSeleccionada: (sedeSeleccionada) => set({ sedeSeleccionada, zona: null, slot: null }),
     setZona: (zona) => set({ zona, slot: null }),
     setSlot: (slot) => set({ slot }),
     setCliente: (c) => set((s) => ({ cliente: { ...s.cliente, ...c } })),
-    resetBooking: () => set({ paso: 1, modelo: null, vehiculo: null, sedeSeleccionada: null, zona: null, slot: null, cliente: clienteInicial }),
+    resetBooking: () => set({ paso: 1, modelo: null, vehiculo: null, vehiculosPool: [], sedeSeleccionada: null, zona: null, slot: null, cliente: clienteInicial }),
 }));

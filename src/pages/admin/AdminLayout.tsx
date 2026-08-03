@@ -91,8 +91,8 @@ export default function AdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const { perfil, cargando, setPerfil } = useAdminStore();
-    const [pendientes, setPendientes] = useState(0);
     const [alertasVenta, setAlertasVenta] = useState(0);
+    const [reservasHoy, setReservasHoy] = useState(0);
     const [permiso, setPermiso] = useState<NotificationPermission>('default');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>(() => {
@@ -233,45 +233,44 @@ export default function AdminLayout() {
         }
     }, []);
 
-    async function cargarConteoPendientes() {
-        const res = await supabase
-            .from('reservas')
-            .select('id', { count: 'exact', head: true })
-            .eq('estado', 'pendiente');
-        setPendientes(res.count || 0);
-    }
-
     async function cargarAlertasVenta() {
         const res = await supabase.from('vehiculos').select('fecha_ingreso, activo').eq('activo', true);
         const total = (res.data || []).filter((v: any) => estaListoParaVenta(v.fecha_ingreso)).length;
         setAlertasVenta(total);
     }
 
+    async function cargarReservasHoy() {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const res = await supabase
+            .from('reservas')
+            .select('id', { count: 'exact', head: true })
+            .eq('fecha', hoy)
+            .in('estado', ['confirmada', 'en_camino', 'en_prueba']);
+        setReservasHoy(res.count || 0);
+    }
+
     useEffect(() => {
         cargarAlertasVenta();
+        cargarReservasHoy();
     }, []);
 
     useEffect(() => {
-        cargarConteoPendientes();
-
         const canal = supabase
             .channel('admin-notificaciones')
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'reservas' },
                 (payload: any) => {
-                    cargarConteoPendientes();
-
-                    if (payload.new.estado !== 'pendiente') return;
+                    cargarReservasHoy();
 
                     const cliente = payload.new.cliente_nombre || 'Un cliente';
 
                     reproducirSonido();
-                    mostrarToast('Nueva prueba de ruta', cliente + ' agendo una prueba y espera aprobacion.');
+                    mostrarToast('Nueva prueba de ruta', cliente + ' agendo y confirmo una prueba de ruta.');
 
                     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification('Nueva prueba de ruta', {
-                            body: cliente + ' agendo una prueba y espera aprobacion.',
+                            body: cliente + ' agendo y confirmo una prueba de ruta.',
                             icon: iconoNotificacion,
                         });
                     }
@@ -281,7 +280,7 @@ export default function AdminLayout() {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'reservas' },
                 (payload: any) => {
-                    cargarConteoPendientes();
+                    cargarReservasHoy();
 
                     const anterior = payload.old;
                     const actual = payload.new;
@@ -385,7 +384,7 @@ export default function AdminLayout() {
                         {NAV.map((item) => {
                             if (item.type === 'link') {
                                 const Icon = item.icon;
-                                const badge = item.to === '/admin' ? pendientes : item.to === '/admin/notificaciones' ? alertasVenta : 0;
+                                const badge = item.to === '/admin' ? reservasHoy : item.to === '/admin/notificaciones' ? alertasVenta : 0;
                                 return (
                                     <NavLink
                                         key={item.to}

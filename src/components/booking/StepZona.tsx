@@ -20,7 +20,7 @@ function calcularDistanciaKm(lat1: number, lon1: number, lat2: number, lon2: num
 }
 
 export function StepZona() {
-    const { modelo, sedeSeleccionada, setSedeSeleccionada, setVehiculo, zona, setZona, setPaso } = useBookingStore();
+    const { modelo, sedeSeleccionada, setSedeSeleccionada, setVehiculo, setVehiculosPool, zona, setZona, setPaso } = useBookingStore();
     const [subPaso, setSubPaso] = useState<'sede' | 'modalidad' | 'municipio' | 'mapa'>(
         sedeSeleccionada ? 'modalidad' : 'sede'
     );
@@ -93,8 +93,11 @@ export function StepZona() {
 
     function elegirSede(sede: any) {
         setSedeSeleccionada(sede);
-        const vehiculoDeSede = vehiculos.find((v: any) => v.sede_id === sede.id);
-        if (vehiculoDeSede) setVehiculo(vehiculoDeSede);
+        const vehiculosDeSede = vehiculos.filter((v: any) => v.sede_id === sede.id);
+        if (vehiculosDeSede.length > 0) {
+            setVehiculo(vehiculosDeSede[0]);
+            setVehiculosPool(vehiculosDeSede);
+        }
         setSubPaso('modalidad');
     }
 

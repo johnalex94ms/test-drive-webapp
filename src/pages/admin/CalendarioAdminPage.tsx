@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ExcelJS from 'exceljs';
-import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, ShipWheel, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
@@ -83,7 +83,7 @@ export default function CalendarioAdminPage() {
         queryFn: async () => {
             const res = await supabase
                 .from('reservas')
-                .select('*, conductores(nombre, foto_url)')
+                .select('*, conductores(nombre, foto_url), asesores(nombre, foto_url)')
                 .eq('fecha', fecha);
             return res.data || [];
         },
@@ -348,28 +348,47 @@ export default function CalendarioAdminPage() {
                                                         className="w-full text-left rounded-sm px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1.5"
                                                         style={{ background: estilo!.bg }}
                                                     >
-                                                        {reserva.conductores && (
-                                                            reserva.conductores.foto_url ? (
-                                                                <img
-                                                                    src={reserva.conductores.foto_url}
-                                                                    alt={reserva.conductores.nombre}
-                                                                    className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                                                                />
-                                                            ) : (
-                                                                <div
-                                                                    className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                                                                    style={{ background: estilo!.texto, color: '#fff' }}
-                                                                >
-                                                                    {iniciales(reserva.conductores.nombre)}
+                                                        {(() => {
+                                                            const esConductor = !!reserva.conductores;
+                                                            const persona = reserva.conductores || (reserva.conducido_por_asesor ? reserva.asesores : null);
+                                                            const IconoRol = esConductor ? ShipWheel : UserRound;
+                                                            if (!persona) return null;
+                                                            return (
+                                                                <div className="relative flex-shrink-0">
+                                                                    {persona.foto_url ? (
+                                                                        <img
+                                                                            src={persona.foto_url}
+                                                                            alt={persona.nombre}
+                                                                            className="w-6 h-6 rounded-full object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <div
+                                                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
+                                                                            style={{ background: estilo!.texto, color: '#fff' }}
+                                                                        >
+                                                                            {iniciales(persona.nombre)}
+                                                                        </div>
+                                                                    )}
+                                                                    <div
+                                                                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full flex items-center justify-center border border-white"
+                                                                        style={{ background: estilo!.texto }}
+                                                                        title={esConductor ? 'Conductor' : 'Asesor comercial'}
+                                                                    >
+                                                                        <IconoRol className="w-2 h-2 text-white" strokeWidth={3} />
+                                                                    </div>
                                                                 </div>
-                                                            )
-                                                        )}
+                                                            );
+                                                        })()}
                                                         <div className="min-w-0">
                                                             <p className="text-[11px] font-semibold truncate" style={{ color: estilo!.texto }}>
                                                                 {reserva.cliente_nombre}
                                                             </p>
                                                             <p className="text-[10px] truncate" style={{ color: estilo!.texto, opacity: 0.8 }}>
-                                                                {reserva.conductores ? reserva.conductores.nombre : 'Sin conductor'}
+                                                                {reserva.conductores
+                                                                    ? reserva.conductores.nombre
+                                                                    : reserva.conducido_por_asesor
+                                                                        ? (reserva.asesores ? reserva.asesores.nombre + ' (asesor)' : 'Asesor comercial')
+                                                                        : 'Sin conductor'}
                                                             </p>
                                                         </div>
                                                     </button>
@@ -415,7 +434,7 @@ export default function CalendarioAdminPage() {
                             <p><strong className="text-[#051620]">Hora:</strong> {reservaSel.hora_inicio.slice(0, 5)} - {reservaSel.hora_fin.slice(0, 5)}</p>
                             <p><strong className="text-[#051620]">Correo:</strong> {reservaSel.cliente_correo}</p>
                             <p><strong className="text-[#051620]">Celular:</strong> {reservaSel.cliente_celular}</p>
-                            <p><strong className="text-[#051620]">Conductor:</strong> {reservaSel.conductores ? reservaSel.conductores.nombre : 'Sin asignar'}</p>
+                            <p><strong className="text-[#051620]">Conductor:</strong> {reservaSel.conductores ? reservaSel.conductores.nombre : (reservaSel.conducido_por_asesor ? 'La hace el asesor: ' + (reservaSel.asesores ? reservaSel.asesores.nombre : 'Sin dato') : 'Sin asignar')}</p>
                             <p><strong className="text-[#051620]">Entrega:</strong> {reservaSel.tipo_entrega === 'domicilio' ? 'A domicilio' : 'En sede'}</p>
                         </div>
                     </div>

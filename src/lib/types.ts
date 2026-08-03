@@ -56,6 +56,7 @@ export interface Reserva {
     vehiculo_id: string;
     asesor_id: string | null;
     conductor_id: string | null;
+    conducido_por_asesor: boolean;
     zona_id: string | null;
     cliente_nombre: string;
     cliente_correo: string;
