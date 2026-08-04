@@ -19,8 +19,10 @@ interface BookingStore {
     zona: Zona | null;
     slot: SlotDisponible | null;
     cliente: ClienteData;
+    panelReservaAbierto: boolean;
 
     setPaso: (paso: 1 | 2 | 3 | 4) => void;
+    setPanelReservaAbierto: (abierto: boolean) => void;
     setModelo: (m: string | null) => void;
     setVehiculo: (v: Vehiculo | null) => void;
     setVehiculosPool: (v: Vehiculo[]) => void;
@@ -49,8 +51,10 @@ export const useBookingStore = create<BookingStore>((set) => ({
     zona: null,
     slot: null,
     cliente: clienteInicial,
+    panelReservaAbierto: false,
 
     setPaso: (paso) => set({ paso }),
+    setPanelReservaAbierto: (panelReservaAbierto) => set({ panelReservaAbierto }),
     setModelo: (modelo) => set({ modelo, vehiculo: null, vehiculosPool: [], sedeSeleccionada: null, zona: null, slot: null }),
     setVehiculo: (vehiculo) => set({ vehiculo, zona: null, slot: null }),
     setVehiculosPool: (vehiculosPool) => set({ vehiculosPool }),

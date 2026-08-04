@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight, RotateCcw, Car, Tag } from 'lucide-react';
+import { Pencil, Trash2, X, Upload, Copy, Search, ChevronLeft, ChevronRight, RotateCcw, Car, Tag, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
 import { DIAS_SEMANA_PICO_PLACA, diasBloqueadosPorPlaca, digitosDelDia, type DiaPicoPlaca } from '../../lib/picoPlaca';
 import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
+import { debeInactivarse, textoCuentaRegresiva } from '../../lib/programacionInactivacion';
 
 const CATEGORIAS = [
     { value: 'automovil', label: 'Automovil' },
@@ -60,6 +61,10 @@ export default function VehiculosAdminPage() {
     const [guardando, setGuardando] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [vehiculoAEliminar, setVehiculoAEliminar] = useState<any>(null);
+    const [vehiculoAProgramar, setVehiculoAProgramar] = useState<any>(null);
+    const [fechaProgramada, setFechaProgramada] = useState('');
+    const [motivoProgramado, setMotivoProgramado] = useState('');
+    const [intentoProgramar, setIntentoProgramar] = useState(false);
     const [subiendoImagenes, setSubiendoImagenes] = useState(false);
     const [busqueda, setBusqueda] = useState('');
     const [sedeFiltro, setSedeFiltro] = useState('todas');
@@ -115,6 +120,19 @@ export default function VehiculosAdminPage() {
     useEffect(() => {
         setPagina(1);
     }, [busqueda, sedeFiltro, categoriaFiltro, estadoFiltro]);
+
+    useEffect(() => {
+        const aInactivar = vehiculosBase.filter(
+            (v: any) => v.activo && v.fecha_inactivacion_programada && debeInactivarse(v.fecha_inactivacion_programada)
+        );
+        if (aInactivar.length === 0) return;
+        (async () => {
+            for (const v of aInactivar) {
+                await supabase.from('vehiculos').update({ activo: false }).eq('id', v.id);
+            }
+            queryClient.invalidateQueries({ queryKey: ['admin-vehiculos'] });
+        })();
+    }, [vehiculosBase, queryClient]);
 
     const versionesSugeridas = Array.from(
         new Set(
@@ -264,6 +282,55 @@ export default function VehiculosAdminPage() {
             setModalAbierto(false);
         } catch (err: any) {
             setErrorMsg(err.code === '23505' ? 'Esa placa ya esta registrada.' : 'Ocurrio un error al guardar.');
+        } finally {
+            setGuardando(false);
+        }
+    }
+
+    function abrirProgramar(v: any) {
+        setVehiculoAProgramar(v);
+        setFechaProgramada(v.fecha_inactivacion_programada || '');
+        setMotivoProgramado(v.motivo_inactivacion_programada || '');
+        setIntentoProgramar(false);
+        setErrorMsg(null);
+    }
+
+    async function guardarProgramacion() {
+        setIntentoProgramar(true);
+        if (!fechaProgramada || !motivoProgramado.trim()) return;
+        setGuardando(true);
+        setErrorMsg(null);
+        try {
+            const res = await supabase
+                .from('vehiculos')
+                .update({
+                    fecha_inactivacion_programada: fechaProgramada,
+                    motivo_inactivacion_programada: motivoProgramado.trim(),
+                })
+                .eq('id', vehiculoAProgramar.id);
+            if (res.error) throw res.error;
+            queryClient.invalidateQueries({ queryKey: ['admin-vehiculos'] });
+            setVehiculoAProgramar(null);
+        } catch {
+            setErrorMsg('Ocurrio un error al guardar la programacion.');
+        } finally {
+            setGuardando(false);
+        }
+    }
+
+    async function quitarProgramacion() {
+        setGuardando(true);
+        setErrorMsg(null);
+        try {
+            const res = await supabase
+                .from('vehiculos')
+                .update({ fecha_inactivacion_programada: null, motivo_inactivacion_programada: null })
+                .eq('id', vehiculoAProgramar.id);
+            if (res.error) throw res.error;
+            queryClient.invalidateQueries({ queryKey: ['admin-vehiculos'] });
+            setVehiculoAProgramar(null);
+        } catch {
+            setErrorMsg('Ocurrio un error al quitar la programacion.');
         } finally {
             setGuardando(false);
         }
@@ -431,7 +498,24 @@ export default function VehiculosAdminPage() {
                                             : undefined;
                                     return (
                                         <tr key={v.id} className="border-t border-[#e5e5e5]">
-                                            <td className="px-3 py-2.5 font-medium text-[#051620]" style={estiloSombreado}>KIA {v.modelo}</td>
+                                            <td className="px-3 py-2.5 font-medium text-[#051620] max-w-[160px]" style={estiloSombreado}>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => abrirProgramar(v)}
+                                                        title="Programar inactivacion"
+                                                        className={'group cursor-pointer hover:text-amber-700 flex-shrink-0 ' + (v.fecha_inactivacion_programada ? 'text-amber-600' : 'text-[#999]')}
+                                                    >
+                                                        <Clock className="w-3.5 h-3.5 nav-icon" />
+                                                    </button>
+                                                    <span>KIA {v.modelo}</span>
+                                                </div>
+                                                {v.fecha_inactivacion_programada && (
+                                                    <p className="italic text-[11px] text-[#999] font-normal mt-0.5 whitespace-normal break-words">
+                                                        {textoCuentaRegresiva(v.fecha_inactivacion_programada)} · {v.motivo_inactivacion_programada}
+                                                    </p>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>{v.version || '—'}</td>
                                             <td className="px-3 py-2.5 text-[#666]" style={estiloSombreado}>{v.placa}</td>
                                             <td className="px-3 py-2.5 text-[#666] capitalize" style={estiloSombreado}>{v.categoria}</td>
@@ -474,25 +558,25 @@ export default function VehiculosAdminPage() {
                                                     type="button"
                                                     onClick={() => duplicarVehiculo(v)}
                                                     title="Duplicar"
-                                                    className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
+                                                    className="group inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                                 >
-                                                    <Copy className="w-3.5 h-3.5" />
+                                                    <Copy className="w-3.5 h-3.5 nav-icon" />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => abrirEditar(v)}
                                                     title="Editar"
-                                                    className="inline-flex items-center justify-center bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
+                                                    className="group inline-flex items-center justify-center bg-teal-50 text-teal-600 hover:bg-teal-100 cursor-pointer transition-colors p-1.5 rounded-sm mr-1.5"
                                                 >
-                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    <Pencil className="w-3.5 h-3.5 nav-icon" />
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setVehiculoAEliminar(v)}
                                                     title="Eliminar"
-                                                    className="inline-flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors p-1.5 rounded-sm"
+                                                    className="group inline-flex items-center justify-center bg-[#f0f0f0] text-[#666] hover:bg-rose-100 hover:text-rose-600 cursor-pointer transition-colors p-1.5 rounded-sm"
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    <Trash2 className="w-3.5 h-3.5 nav-icon" />
                                                 </button>
                                             </td>
                                         </tr>
@@ -741,6 +825,85 @@ export default function VehiculosAdminPage() {
                             >
                                 {guardando ? 'Guardando...' : 'Guardar'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal programar inactivacion */}
+            {vehiculoAProgramar && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-sm max-w-sm w-full p-6">
+                        <div className="flex items-center gap-2.5 mb-2">
+                            <Clock className="w-5 h-5 text-amber-600" />
+                            <p className="font-display text-lg font-bold text-[#051620]">
+                                Crear programación
+                            </p>
+                        </div>
+                        <p className="text-sm text-[#666] mb-4">
+                            KIA {vehiculoAProgramar.modelo} ({vehiculoAProgramar.placa}) se desactivara automaticamente en la fecha indicada.
+                        </p>
+
+                        <div className="flex flex-col gap-3 mb-2">
+                            <div>
+                                <label className="text-xs text-[#666] block mb-1">Fecha de inactivacion</label>
+                                <Input
+                                    type="date"
+                                    value={fechaProgramada}
+                                    onChange={(e) => setFechaProgramada(e.target.value)}
+                                />
+                                {intentoProgramar && !fechaProgramada && (
+                                    <p className="text-xs text-red-600 mt-1">La fecha es obligatoria.</p>
+                                )}
+                            </div>
+                            <div>
+                                <Input
+                                    type="text"
+                                    placeholder="Motivo (ej. Fin de semana de prueba)"
+                                    value={motivoProgramado}
+                                    onChange={(e) => setMotivoProgramado(e.target.value)}
+                                    maxLength={60}
+                                />
+                                {intentoProgramar && !motivoProgramado.trim() && (
+                                    <p className="text-xs text-red-600 mt-1">El motivo es obligatorio.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {errorMsg && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-3 py-2 mb-2">
+                                {errorMsg}
+                            </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-3 mt-4">
+                            {vehiculoAProgramar.fecha_inactivacion_programada ? (
+                                <button
+                                    type="button"
+                                    disabled={guardando}
+                                    onClick={quitarProgramacion}
+                                    className="text-sm text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                                >
+                                    Quitar programacion
+                                </button>
+                            ) : <span />}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setVehiculoAProgramar(null)}
+                                    className="text-sm text-[#666] hover:text-[#051620] cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={guardando}
+                                    onClick={guardarProgramacion}
+                                    className="bg-[#051620] text-white text-sm font-medium px-5 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                                >
+                                    {guardando ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

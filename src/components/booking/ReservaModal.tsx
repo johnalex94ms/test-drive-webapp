@@ -363,7 +363,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
   );
 
   const cuerpo = (
-    <div className={variant === 'panel' ? 'p-6 flex flex-col gap-8' : 'p-6 grid md:grid-cols-2 gap-8'}>
+    <div className={variant === 'panel' ? 'p-6 flex flex-col gap-0' : 'p-6 grid md:grid-cols-2 gap-8'}>
 
       {/* Columna izquierda: horario + conductor + ubicacion */}
       <div>

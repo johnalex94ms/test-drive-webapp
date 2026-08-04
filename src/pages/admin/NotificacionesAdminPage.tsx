@@ -29,7 +29,7 @@ export default function NotificacionesAdminPage() {
             <div className="mb-6">
                 <h1 className="font-display text-2xl font-bold text-[#051620]">Notificaciones</h1>
                 <p className="text-sm text-[#666]">
-                    Alertas de la plataforma. Por ahora: vehiculos que cumplieron su vida util de prueba (3 meses) y estan listos para vender.
+                    Alertas de la plataforma sobre eventos que requieren tu atencion.
                 </p>
             </div>
 

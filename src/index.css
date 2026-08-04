@@ -109,6 +109,32 @@
   animation: slideInRight 280ms ease-out;
 }
 
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 260ms ease-in forwards;
+}
+
+@keyframes fadeOutBackdrop {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-fade-out-backdrop {
+  animation: fadeOutBackdrop 260ms ease-in forwards;
+}
+
 .scroll-fino {
   scrollbar-width: thin;
   scrollbar-color: #d4d4d4 transparent;

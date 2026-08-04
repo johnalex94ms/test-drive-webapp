@@ -159,12 +159,12 @@ export function StepZona() {
         <div className="w-full">
             <div className="mb-8">
                 <h2 className="font-display text-3xl font-bold text-[#051620]">
-                    {subPaso === 'sede' && '¿Dónde queda el KIA ' + modelo + '?'}
-                    {subPaso !== 'sede' && '¿Cómo quieres hacer tu prueba?'}
+                    {subPaso === 'sede' && 'Selecciona la sede del KIA ' + modelo}
+                    {subPaso !== 'sede' && '¿Cómo quiere tu cliente hacer la prueba?'}
                 </h2>
                 <p className="text-[#666666] mt-2">
                     {subPaso === 'sede' && 'Te mostramos las sedes donde puedes encontrar este vehiculo.'}
-                    {subPaso !== 'sede' && 'Elige si prefieres ir a la sede o que te lo llevemos a domicilio.'}
+                    {subPaso !== 'sede' && 'Elige si tu cliente prefiere ir a la sede o que se lo lleven a domicilio.'}
                 </p>
             </div>
 

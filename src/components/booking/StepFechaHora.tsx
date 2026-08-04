@@ -106,11 +106,34 @@ function getDayPropGetter(ocupadosPorDia: any, diasCompletos: any, diasPicoPlaca
 }
 
 export function StepFechaHora() {
-    const { vehiculo, vehiculosPool, zona, setPaso } = useBookingStore();
+    const { vehiculo, vehiculosPool, zona, setPaso, setPanelReservaAbierto } = useBookingStore();
     const [fechaVisible, setFechaVisible] = useState(new Date());
     const [vista, setVista] = useState<View>('month');
     const [diaModal, setDiaModal] = useState<string | null>(null);
+    const [cerrandoDiaModal, setCerrandoDiaModal] = useState(false);
     const [eventoDetalle, setEventoDetalle] = useState<any>(null);
+
+    useEffect(() => {
+        return () => setPanelReservaAbierto(false);
+    }, [setPanelReservaAbierto]);
+
+    useEffect(() => {
+        if (!diaModal) return;
+        const overflowPrevio = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = overflowPrevio;
+        };
+    }, [diaModal]);
+
+    function cerrarDiaModal() {
+        setCerrandoDiaModal(true);
+        setTimeout(() => {
+            setDiaModal(null);
+            setCerrandoDiaModal(false);
+            setPanelReservaAbierto(false);
+        }, 260);
+    }
     const queryClient = useQueryClient();
 
     const pool = vehiculosPool.length > 0 ? vehiculosPool : (vehiculo ? [vehiculo] : []);
@@ -313,6 +336,7 @@ export function StepFechaHora() {
 
     function onDiaClick(diaStr: string) {
         setDiaModal(diaStr);
+        setPanelReservaAbierto(true);
     }
 
     function handleSelectSlot(slotInfo: any) {
@@ -348,10 +372,10 @@ export function StepFechaHora() {
                     endAccessor="end"
                     views={['month', 'week', 'day', 'agenda']}
                     view={vista}
-                    onView={setVista}
+                    onView={(v: View) => { if (!diaModal) setVista(v); }}
                     date={fechaVisible}
-                    onNavigate={setFechaVisible}
-                    selectable={true}
+                    onNavigate={(fecha: Date) => { if (!diaModal) setFechaVisible(fecha); }}
+                    selectable={!diaModal}
                     onSelectSlot={handleSelectSlot}
                     onSelectEvent={(event: any) => setEventoDetalle(event.resource)}
                     formats={{
@@ -392,7 +416,8 @@ export function StepFechaHora() {
             <button
                 type="button"
                 onClick={() => setPaso(2)}
-                className="text-sm text-[#666] hover:text-[#051620] transition-colors cursor-pointer"
+                disabled={!!diaModal}
+                className="text-sm text-[#666] hover:text-[#051620] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
                 Cambiar ubicacion
             </button>
@@ -400,10 +425,9 @@ export function StepFechaHora() {
             {diaModal && (
                 <>
                     <div
-                        className="fixed inset-0 z-50 bg-black/50"
-                        onClick={() => setDiaModal(null)}
+                        className={'fixed inset-0 z-50 bg-black/50' + (cerrandoDiaModal ? ' animate-fade-out-backdrop' : '')}
                     />
-                    <div className="fixed inset-y-0 right-0 z-[60] w-full sm:w-[440px] xl:w-[480px] bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
+                    <div className={'fixed inset-y-0 right-0 z-[60] w-full sm:w-[440px] xl:w-[480px] bg-white shadow-2xl overflow-y-auto ' + (cerrandoDiaModal ? 'animate-slide-out-right' : 'animate-slide-in-right')}>
                         <ReservaModal
                             variant="panel"
                             vehiculo={vehiculo}
@@ -411,7 +435,7 @@ export function StepFechaHora() {
                             vehiculosSede={poolSede}
                             zona={zona}
                             fecha={diaModal}
-                            onClose={() => setDiaModal(null)}
+                            onClose={cerrarDiaModal}
                             onSuccess={(id: string) => window.location.assign('/tracker/' + id)}
                         />
                     </div>

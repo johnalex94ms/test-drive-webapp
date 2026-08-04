@@ -8,6 +8,7 @@ const PASOS = ['Vehículo', 'Ubicación', 'Fecha y hora', 'Tus datos'];
 
 export default function BookingPage() {
     const paso = useBookingStore((s) => s.paso);
+    const panelReservaAbierto = useBookingStore((s) => s.panelReservaAbierto);
 
     return (
         <div className="min-h-screen bg-[#f8f8f8]">
@@ -20,9 +21,15 @@ export default function BookingPage() {
                         alt="Distrikia"
                         className="h-7"
                     />
-                    <a href="/" className="text-white/60 text-sm hover:text-white transition-colors">
-                        ← Volver al inicio
-                    </a>
+                    {panelReservaAbierto ? (
+                        <span className="text-white/30 text-sm cursor-not-allowed">
+                            ← Volver al inicio
+                        </span>
+                    ) : (
+                        <a href="/" className="text-white/60 text-sm hover:text-white transition-colors">
+                            ← Volver al inicio
+                        </a>
+                    )}
                 </div>
             </header>
 
