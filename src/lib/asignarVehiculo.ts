@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { diasBloqueadosPorPlaca, type DiaPicoPlaca } from './picoPlaca';
+import { vehiculoBloqueadoEnFecha, type VehiculoBloqueo } from './vehiculosBloqueos';
 
 interface VehiculoCandidato {
     id: string;
@@ -9,10 +10,14 @@ interface VehiculoCandidato {
 export function vehiculosDisponiblesEseDia(
     pool: VehiculoCandidato[],
     fecha: string,
-    picoPlacaConfig: DiaPicoPlaca[]
+    picoPlacaConfig: DiaPicoPlaca[],
+    bloqueos: VehiculoBloqueo[] = []
 ): VehiculoCandidato[] {
     const diaSemana = new Date(fecha + 'T00:00:00').getDay();
-    return pool.filter((v) => !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana));
+    return pool.filter((v) =>
+        !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana) &&
+        !vehiculoBloqueadoEnFecha(v.id, fecha, bloqueos)
+    );
 }
 
 export async function asignarVehiculoDisponible(

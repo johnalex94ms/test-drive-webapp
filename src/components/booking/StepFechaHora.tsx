@@ -11,6 +11,7 @@ import { useBookingStore } from '../../store/bookingStore';
 import { ReservaModal } from './ReservaModal';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
 import { diasBloqueadosPorPlaca, type DiaPicoPlaca } from '../../lib/picoPlaca';
+import { vehiculoBloqueadoEnFecha, type VehiculoBloqueo } from '../../lib/vehiculosBloqueos';
 import { obtenerFotoCarro } from '../../lib/vehiculoImagenes';
 
 const localizer = dateFnsLocalizer({
@@ -149,6 +150,15 @@ export function StepFechaHora() {
                     queryClient.invalidateQueries({ queryKey: ['conductor-disponible'] });
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'vehiculos_bloqueos' },
+                (payload: any) => {
+                    const idAfectado = (payload.new && payload.new.vehiculo_id) || (payload.old && payload.old.vehiculo_id);
+                    if (idAfectado && !poolSedeIds.includes(idAfectado)) return;
+                    queryClient.invalidateQueries({ queryKey: ['vehiculos-bloqueos'] });
+                }
+            )
             .subscribe();
 
         return () => {
@@ -196,8 +206,23 @@ export function StepFechaHora() {
         },
     });
 
+    const vehiculosBloqueadosQuery = useQuery({
+        queryKey: ['vehiculos-bloqueos', poolSedeIdsKey, inicioMesStr, finMesStr],
+        enabled: poolSedeIds.length > 0,
+        queryFn: async () => {
+            const res = await supabase
+                .from('vehiculos_bloqueos')
+                .select('*')
+                .in('vehiculo_id', poolSedeIds)
+                .lte('fecha_inicio', finMesStr)
+                .gte('fecha_fin', inicioMesStr);
+            return (res.data || []) as VehiculoBloqueo[];
+        },
+    });
+
     const reservas = reservasQuery.data || [];
     const picoPlacaConfig = picoPlacaConfigQuery.data || [];
+    const vehiculosBloqueados = vehiculosBloqueadosQuery.data || [];
 
     // Un dia solo queda bloqueado por pico y placa si TODAS las unidades de la sede estan restringidas ese dia
     const diasPicoPlaca = poolSede.reduce((dias: number[] | null, v: any) => {
@@ -213,7 +238,45 @@ export function StepFechaHora() {
 
     function unidadesDisponiblesEseDia(diaStr: string) {
         const diaSemana = new Date(diaStr + 'T00:00:00').getDay();
-        return poolSede.filter((v: any) => !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana)).length;
+        return poolSede.filter((v: any) =>
+            !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana) &&
+            !vehiculoBloqueadoEnFecha(v.id, diaStr, vehiculosBloqueados)
+        ).length;
+    }
+
+    // Si TODOS los vehiculos de la sede quedan bloqueados por evento/mantenimiento ese dia, se marca como lleno
+    if (vehiculosBloqueados.length > 0 && poolSede.length > 0) {
+        let cursor = new Date(inicioMes);
+        while (cursor <= finMes) {
+            const diaStr = format(cursor, 'yyyy-MM-dd');
+            if (!fechasBloqueadas[diaStr] && !diasPicoPlaca.includes(cursor.getDay())) {
+                const motivos = poolSede
+                    .map((v: any) => vehiculoBloqueadoEnFecha(v.id, diaStr, vehiculosBloqueados))
+                    .filter(Boolean) as VehiculoBloqueo[];
+                if (motivos.length === poolSede.length) {
+                    fechasBloqueadas[diaStr] = motivos.length === 1 ? motivos[0].motivo : 'Vehiculos no disponibles';
+                }
+            }
+            cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+        }
+    }
+
+    // Si TODAS las unidades del modelo elegido por el cliente quedan bloqueadas ese dia, tambien se marca
+    // (aunque otros modelos de la sede sigan disponibles), para que se vea el motivo de inmediato.
+    if (vehiculosBloqueados.length > 0 && pool.length > 0) {
+        let cursor = new Date(inicioMes);
+        while (cursor <= finMes) {
+            const diaStr = format(cursor, 'yyyy-MM-dd');
+            if (!fechasBloqueadas[diaStr]) {
+                const motivosModelo = pool
+                    .map((v: any) => vehiculoBloqueadoEnFecha(v.id, diaStr, vehiculosBloqueados))
+                    .filter(Boolean) as VehiculoBloqueo[];
+                if (motivosModelo.length === pool.length) {
+                    fechasBloqueadas[diaStr] = motivosModelo.length === 1 ? motivosModelo[0].motivo : 'Vehiculo no disponible';
+                }
+            }
+            cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+        }
     }
 
     const ocupadosPorDia: Record<string, string[]> = {};

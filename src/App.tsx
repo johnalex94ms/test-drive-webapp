@@ -20,6 +20,7 @@ import PicoPlacaAdminPage from './pages/admin/PicoPlacaAdminPage';
 import ReportesAdminPage from './pages/admin/ReportesAdminPage';
 import NotificacionesAdminPage from './pages/admin/NotificacionesAdminPage';
 import DiasBloqueadosAdminPage from './pages/admin/DiasBloqueadosAdminPage';
+import VehiculosBloqueadosAdminPage from './pages/admin/VehiculosBloqueadosAdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="pico-placa" element={<PicoPlacaAdminPage />} />
             <Route path="notificaciones" element={<NotificacionesAdminPage />} />
             <Route path="dias-bloqueados" element={<DiasBloqueadosAdminPage />} />
+            <Route path="vehiculos-bloqueados" element={<VehiculosBloqueadosAdminPage />} />
             <Route path="reportes" element={<ReportesAdminPage />} />
           </Route>
 

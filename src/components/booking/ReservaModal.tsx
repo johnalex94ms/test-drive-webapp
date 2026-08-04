@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { asignarConductorDisponible } from '../../lib/asignarConductor';
 import { asignarVehiculoDisponible, vehiculosDisponiblesEseDia } from '../../lib/asignarVehiculo';
 import type { DiaPicoPlaca } from '../../lib/picoPlaca';
+import type { VehiculoBloqueo } from '../../lib/vehiculosBloqueos';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
@@ -90,12 +91,28 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
     },
   });
 
+  const poolSedeIds = poolSede.map((v: any) => v.id);
+  const vehiculosBloqueadosQuery = useQuery({
+    queryKey: ['vehiculos-bloqueos-reserva', poolSedeIds.slice().sort().join(','), fecha],
+    enabled: poolSedeIds.length > 0,
+    queryFn: async () => {
+      const res = await supabase
+        .from('vehiculos_bloqueos')
+        .select('*')
+        .in('vehiculo_id', poolSedeIds)
+        .lte('fecha_inicio', fecha)
+        .gte('fecha_fin', fecha);
+      return (res.data || []) as VehiculoBloqueo[];
+    },
+  });
+  const vehiculosBloqueados = vehiculosBloqueadosQuery.data || [];
+
   // Disponibilidad de horas: es la misma para toda la sede, sin importar el modelo elegido
-  const poolSedeDelDia = vehiculosDisponiblesEseDia(poolSede, fecha, picoPlacaConfigQuery.data || []);
+  const poolSedeDelDia = vehiculosDisponiblesEseDia(poolSede, fecha, picoPlacaConfigQuery.data || [], vehiculosBloqueados);
   const poolSedeDelDiaIds = poolSedeDelDia.map((v: any) => v.id);
 
   // Asignacion final del vehiculo especifico: debe ser del MISMO modelo elegido
-  const poolModeloDelDia = vehiculosDisponiblesEseDia(pool, fecha, picoPlacaConfigQuery.data || []);
+  const poolModeloDelDia = vehiculosDisponiblesEseDia(pool, fecha, picoPlacaConfigQuery.data || [], vehiculosBloqueados);
 
   const conductorQuery = useQuery({
     queryKey: ['conductor-disponible', vehiculo.sede_id, fecha, horaSel],

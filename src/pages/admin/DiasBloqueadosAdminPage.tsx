@@ -89,7 +89,7 @@ export default function DiasBloqueadosAdminPage() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [guardando, setGuardando] = useState(false);
     const [fechaAEliminar, setFechaAEliminar] = useState<any>(null);
-    const [fechaABloquear, setFechaABloquear] = useState<string | null>(null);
+    const [diasABloquear, setDiasABloquear] = useState<string[] | null>(null);
     const [motivoBloqueo, setMotivoBloqueo] = useState('');
     const [intentoBloquear, setIntentoBloquear] = useState(false);
     const [intentoAgregarLateral, setIntentoAgregarLateral] = useState(false);
@@ -124,11 +124,32 @@ export default function DiasBloqueadosAdminPage() {
             queryClient.invalidateQueries({ queryKey: ['admin-dias-bloqueados'] });
             setNuevaFecha(hoyISO());
             setNuevoMotivo('');
-            setFechaABloquear(null);
-            setMotivoBloqueo('');
-            setIntentoBloquear(false);
         } catch (err: any) {
             setErrorMsg(err && err.code === '23505' ? 'Esa fecha ya esta bloqueada.' : 'Ocurrio un error al guardar la fecha.');
+        } finally {
+            setGuardando(false);
+        }
+    }
+
+    async function agregarDias(fechas: string[], motivo: string) {
+        const nuevas = fechas.filter((f) => !diasBloqueados[f]);
+        if (nuevas.length === 0) {
+            setErrorMsg('Todas las fechas seleccionadas ya estan bloqueadas.');
+            return;
+        }
+
+        setGuardando(true);
+        setErrorMsg(null);
+        try {
+            const filas = nuevas.map((fecha) => ({ fecha, motivo: motivo.trim() }));
+            const res = await supabase.from('dias_bloqueados').insert(filas);
+            if (res.error) throw res.error;
+            queryClient.invalidateQueries({ queryKey: ['admin-dias-bloqueados'] });
+            setDiasABloquear(null);
+            setMotivoBloqueo('');
+            setIntentoBloquear(false);
+        } catch {
+            setErrorMsg('Ocurrio un error al guardar las fechas.');
         } finally {
             setGuardando(false);
         }
@@ -154,17 +175,37 @@ export default function DiasBloqueadosAdminPage() {
             setFechaAEliminar({ fecha: diaStr, motivo: diasBloqueados[diaStr] });
             return;
         }
-        if (fechaABloquear === diaStr) return;
         setErrorMsg(null);
         setIntentoBloquear(false);
         setMotivoBloqueo('');
-        setFechaABloquear(diaStr);
+        setDiasABloquear([diaStr]);
+    }
+
+    function onSeleccionCalendario(slotInfo: any) {
+        const fechas = Array.from(new Set<string>(
+            (slotInfo.slots && slotInfo.slots.length > 0 ? slotInfo.slots : [slotInfo.start]).map((d: Date) => format(d, 'yyyy-MM-dd'))
+        ));
+
+        if (fechas.length <= 1) {
+            onDiaClickCalendario(fechas[0]);
+            return;
+        }
+
+        if (fechas.every((f) => diasBloqueados[f])) {
+            setErrorMsg('Todas las fechas seleccionadas ya estan bloqueadas.');
+            return;
+        }
+
+        setErrorMsg(null);
+        setIntentoBloquear(false);
+        setMotivoBloqueo('');
+        setDiasABloquear(fechas);
     }
 
     function confirmarBloqueo() {
         setIntentoBloquear(true);
-        if (!fechaABloquear || !motivoBloqueo.trim()) return;
-        agregarDia(fechaABloquear, motivoBloqueo);
+        if (!diasABloquear || !motivoBloqueo.trim()) return;
+        agregarDias(diasABloquear, motivoBloqueo);
     }
 
     return (
@@ -190,7 +231,8 @@ export default function DiasBloqueadosAdminPage() {
                         date={fechaVisible}
                         onNavigate={setFechaVisible}
                         selectable={true}
-                        onSelectSlot={(slotInfo: any) => onDiaClickCalendario(format(slotInfo.start, 'yyyy-MM-dd'))}
+                        longPressThreshold={150}
+                        onSelectSlot={onSeleccionCalendario}
                         formats={{
                             monthHeaderFormat: (date: Date) => format(date, 'MMMM yyyy', { locale: es }),
                             weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
@@ -207,7 +249,7 @@ export default function DiasBloqueadosAdminPage() {
                         }}
                     />
                     <p className="text-xs text-[#999] mt-3">
-                        Click en un dia libre para bloquearlo. Click en un dia bloqueado (rojo) para desbloquearlo.
+                        Click en un dia libre para bloquearlo, o arrastra el mouse sobre varios dias para bloquearlos juntos. Click en un dia bloqueado (rojo) para desbloquearlo.
                     </p>
                 </div>
 
@@ -321,22 +363,43 @@ export default function DiasBloqueadosAdminPage() {
             )}
 
             {/* Modal bloquear */}
-            {fechaABloquear && (
+            {diasABloquear && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-sm max-w-sm w-full p-6">
                         <div className="flex items-center gap-2.5 mb-2">
                             <Ban className="w-5 h-5 text-[#051620]" />
                             <p className="font-display text-lg font-bold text-[#051620]">
-                                Bloquear {fechaABloquear}?
+                                {diasABloquear.length === 1
+                                    ? 'Bloquear ' + diasABloquear[0] + '?'
+                                    : 'Bloquear ' + diasABloquear.length + ' dias?'}
                             </p>
                         </div>
+
+                        {diasABloquear.length > 1 && (
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                {diasABloquear.map((f) => (
+                                    <span
+                                        key={f}
+                                        className={
+                                            'text-xs px-2 py-1 rounded-full ' +
+                                            (diasBloqueados[f] ? 'bg-[#f0f0f0] text-[#999] line-through' : 'bg-[#f8f8f8] text-[#051620]')
+                                        }
+                                    >
+                                        {f}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
                         <p className="text-sm text-[#666] mb-3">
-                            Este dia quedara sin disponibilidad para agendar test drives.
+                            {diasABloquear.length === 1
+                                ? 'Este dia quedara sin disponibilidad para agendar test drives.'
+                                : 'Estos dias quedaran sin disponibilidad para agendar test drives. Las fechas tachadas ya estaban bloqueadas y se omitiran.'}
                         </p>
                         <div className="mb-2">
                             <Input
                                 type="text"
-                                placeholder="Motivo (ej. Navidad)"
+                                placeholder={diasABloquear.length === 1 ? 'Motivo (ej. Navidad)' : 'Motivo (aplica a todas las fechas)'}
                                 value={motivoBloqueo}
                                 onChange={(e) => setMotivoBloqueo(e.target.value)}
                                 maxLength={60}
@@ -355,7 +418,7 @@ export default function DiasBloqueadosAdminPage() {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setFechaABloquear(null);
+                                    setDiasABloquear(null);
                                     setMotivoBloqueo('');
                                     setIntentoBloquear(false);
                                     setErrorMsg(null);

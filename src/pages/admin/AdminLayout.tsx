@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation, NavLink, Link } from 'react-router-dom';
-import { Bell, BellRing, BellOff, ClipboardList, CalendarDays, Users, UserRound, BarChart3, Car, LogOut, X, CalendarClock, Ban, ChevronDown, PanelLeftDashed, Check } from 'lucide-react';
+import { Bell, BellRing, BellOff, ClipboardList, CalendarDays, Users, UserRound, BarChart3, Car, LogOut, X, CalendarClock, Ban, Wrench, ChevronDown, PanelLeftDashed, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
@@ -41,6 +41,7 @@ const NAV: (NavLinkItem | NavGroupItem)[] = [
             { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
             { to: '/admin/pico-placa', label: 'Pico y placa', icon: CalendarClock },
             { to: '/admin/dias-bloqueados', label: 'Dias bloqueados', icon: Ban },
+            { to: '/admin/vehiculos-bloqueados', label: 'Vehiculos bloqueados', icon: Wrench },
         ]
     },
     {

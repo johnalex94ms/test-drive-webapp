@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ExcelJS from 'exceljs';
-import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, ShipWheel, UserRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, ShipWheel, UserRound, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
@@ -89,6 +89,18 @@ export default function CalendarioAdminPage() {
         },
     });
 
+    const vehiculosBloqueadosQuery = useQuery({
+        queryKey: ['admin-calendario-vehiculos-bloqueados', fecha],
+        queryFn: async () => {
+            const res = await supabase
+                .from('vehiculos_bloqueos')
+                .select('*')
+                .lte('fecha_inicio', fecha)
+                .gte('fecha_fin', fecha);
+            return res.data || [];
+        },
+    });
+
     useEffect(() => {
         const canal = supabase
             .channel('admin-calendario-realtime')
@@ -97,6 +109,13 @@ export default function CalendarioAdminPage() {
                 { event: '*', schema: 'public', table: 'reservas' },
                 () => {
                     queryClient.invalidateQueries({ queryKey: ['admin-calendario-reservas'] });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'vehiculos_bloqueos' },
+                () => {
+                    queryClient.invalidateQueries({ queryKey: ['admin-calendario-vehiculos-bloqueados'] });
                 }
             )
             .subscribe();
@@ -109,6 +128,11 @@ export default function CalendarioAdminPage() {
     const sedes = sedesQuery.data || [];
     const conductores = conductoresQuery.data || [];
     const reservasDia = reservasDiaQuery.data || [];
+
+    const bloqueosPorVehiculo: Record<string, { motivo: string; fecha_inicio: string; fecha_fin: string }> = {};
+    (vehiculosBloqueadosQuery.data || []).forEach((b: any) => {
+        bloqueosPorVehiculo[b.vehiculo_id] = b;
+    });
 
     const vehiculosBase = vehiculosQuery.data || [];
     const vehiculos = vehiculoFiltro === 'todos'
@@ -306,6 +330,10 @@ export default function CalendarioAdminPage() {
                         {val.label}
                     </span>
                 ))}
+                <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
+                    Vehiculo bloqueado (novedad)
+                </span>
             </div>
 
             {cargando ? (
@@ -330,13 +358,26 @@ export default function CalendarioAdminPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {vehiculos.map((v: any) => (
+                            {vehiculos.map((v: any) => {
+                                const bloqueo = bloqueosPorVehiculo[v.id];
+                                const horarios = obtenerHorariosDelDia(fecha);
+                                return (
                                 <tr key={v.id} className="border-t border-[#e5e5e5]">
                                     <td className="sticky left-0 bg-white px-4 py-2 border-r border-[#e5e5e5]">
                                         <p className="font-medium text-[#051620] text-sm">KIA {v.modelo}</p>
                                         <p className="text-xs text-[#999]">{v.placa} · {v.sedes ? v.sedes.nombre : ''}</p>
                                     </td>
-                                    {obtenerHorariosDelDia(fecha).map((h) => {
+                                    {bloqueo ? (
+                                        <td colSpan={horarios.length} className="border-l border-[#e5e5e5] p-1.5 align-top">
+                                            <div
+                                                className="w-full h-[42px] rounded-sm bg-red-50 border border-red-100 flex items-center gap-2 px-3"
+                                                title={bloqueo.motivo}
+                                            >
+                                                <Ban className="w-4 h-4 text-red-600 flex-shrink-0" />
+                                                <span className="text-xs font-medium text-red-700 truncate">{bloqueo.motivo}</span>
+                                            </div>
+                                        </td>
+                                    ) : horarios.map((h) => {
                                         const reserva = buscarReserva(v.id, h);
                                         const estilo = reserva ? ESTILO_ESTADO[reserva.estado] : null;
                                         return (
@@ -399,7 +440,8 @@ export default function CalendarioAdminPage() {
                                         );
                                     })}
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
