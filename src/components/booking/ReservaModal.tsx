@@ -53,9 +53,20 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
   const [licenciaFile, setLicenciaFile] = useState<File | null>(null);
   const [licenciaPreview, setLicenciaPreview] = useState<string | null>(null);
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [facturaMismaPersona, setFacturaMismaPersona] = useState(false);
+  const [facturaNombre, setFacturaNombre] = useState('');
+  const [facturaDocumento, setFacturaDocumento] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [intentoEnviar, setIntentoEnviar] = useState(false);
+
+  useEffect(() => {
+    if (!facturaMismaPersona) return;
+    setFacturaNombre((nombres + ' ' + apellidos).trim());
+    setFacturaDocumento(numeroDocumento);
+  }, [facturaMismaPersona, nombres, apellidos, numeroDocumento]);
+
+  const datosClienteCompletos = !!(nombres.trim() && apellidos.trim() && numeroDocumento.trim());
 
   const sedeQuery = useQuery({
     queryKey: ['sede-info', vehiculo.sede_id],
@@ -309,6 +320,8 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
           numero_documento: numeroDocumento,
           cliente_correo: correo,
           cliente_celular: celular,
+          factura_nombre: facturaNombre || null,
+          factura_documento: facturaDocumento || null,
           ciudad: ciudad,
           comentario: comentario || null,
           licencia_url: licenciaUrl,
@@ -376,7 +389,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
       <div>
         <div className="flex flex-col gap-4 mb-2">
           <div className="flex flex-col">
-            <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+            <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-2">
               Horario
             </p>
             {ocupadosQuery.isLoading ? (
@@ -414,7 +427,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
           </div>
 
           <div className="flex flex-col">
-            <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+            <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-2">
               Conductor asignado
             </p>
             <div className="flex flex-col">
@@ -458,7 +471,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
           </div>
         </div>
 
-        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+        <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-2">
           Ubicacion de la prueba
         </p>
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -481,7 +494,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
 
       {/* Columna derecha: asesor + formulario */}
       <div>
-        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+        <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-2">
           Asesor encargado
         </p>
         <div className="relative mb-4">
@@ -512,7 +525,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
           )}
         </div>
 
-        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">
+        <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-2">
           Datos de tu cliente
         </p>
         <div className="flex flex-col gap-3 mb-4">
@@ -619,6 +632,53 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
             </span>
           </label>
         </div>
+
+        {datosClienteCompletos && (
+          <div className="mt-10">
+            <p className="text-xs font-semibold text-[#051620]/70 uppercase tracking-widest mb-1">
+              Datos de facturacion
+            </p>
+            <p className="text-xs text-[#999] mb-3">
+              Estos datos corresponden a quien se le va a realizar la factura del vehiculo.
+            </p>
+
+            <label className="flex items-center gap-2 cursor-pointer mb-3">
+              <input
+                type="checkbox"
+                checked={facturaMismaPersona}
+                onChange={(e) => {
+                  setFacturaMismaPersona(e.target.checked);
+                  if (!e.target.checked) {
+                    setFacturaNombre('');
+                    setFacturaDocumento('');
+                  }
+                }}
+                className="cursor-pointer"
+              />
+              <span className="text-xs text-[#666]">
+                Es la misma persona que realiza el test drive
+              </span>
+            </label>
+
+            <div className="flex flex-col gap-3">
+              <Input
+                icon={User}
+                placeholder="Nombre completo"
+                value={facturaNombre}
+                onChange={(e) => setFacturaNombre(e.target.value)}
+                disabled={facturaMismaPersona}
+              />
+              <Input
+                icon={IdCard}
+                placeholder="Cedula"
+                inputMode="numeric"
+                value={facturaDocumento}
+                onChange={(e) => setFacturaDocumento(e.target.value)}
+                disabled={facturaMismaPersona}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

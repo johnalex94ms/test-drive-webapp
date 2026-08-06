@@ -9,12 +9,10 @@ import { obtenerFotoCarro } from '../../lib/vehiculoImagenes';
 import { fechaHoyLocal } from '../../lib/fecha';
 
 const ESTILO_ESTADO: Record<string, { bg: string; texto: string; label: string }> = {
-    pendiente: { bg: '#fdf3d9', texto: '#8a6d00', label: 'Pendiente' },
     confirmada: { bg: '#dcf3e4', texto: '#0a6e3a', label: 'Confirmada' },
     en_camino: { bg: '#dbe9fb', texto: '#0a4a8a', label: 'En camino' },
     en_prueba: { bg: '#dbe9fb', texto: '#0a4a8a', label: 'En prueba' },
     finalizada: { bg: '#f0f0f0', texto: '#666666', label: 'Finalizada' },
-    rechazada: { bg: '#fbdcdc', texto: '#8a1f1f', label: 'Rechazada' },
     cancelada: { bg: '#f0f0f0', texto: '#999999', label: 'Cancelada' },
 };
 

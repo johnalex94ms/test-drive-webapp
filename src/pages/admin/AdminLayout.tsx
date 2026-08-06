@@ -95,6 +95,11 @@ export default function AdminLayout() {
     const { perfil, cargando, setPerfil } = useAdminStore();
     const [alertasVenta, setAlertasVenta] = useState(0);
     const [reservasHoy, setReservasHoy] = useState(0);
+    const [reservasVistasBase, setReservasVistasBase] = useState(() =>
+        localStorage.getItem('reservas_vistas_fecha') === fechaHoyLocal()
+            ? Number(localStorage.getItem('reservas_vistas_base') || 0)
+            : 0
+    );
     const [permiso, setPermiso] = useState<NotificationPermission>('default');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [gruposAbiertos, setGruposAbiertos] = useState<Record<string, boolean>>(() => {
@@ -257,6 +262,13 @@ export default function AdminLayout() {
     }, []);
 
     useEffect(() => {
+        if (location.pathname !== '/admin') return;
+        localStorage.setItem('reservas_vistas_base', String(reservasHoy));
+        localStorage.setItem('reservas_vistas_fecha', fechaHoyLocal());
+        setReservasVistasBase(reservasHoy);
+    }, [location.pathname, reservasHoy]);
+
+    useEffect(() => {
         const canal = supabase
             .channel('admin-notificaciones')
             .on(
@@ -386,7 +398,7 @@ export default function AdminLayout() {
                         {NAV.map((item) => {
                             if (item.type === 'link') {
                                 const Icon = item.icon;
-                                const badge = item.to === '/admin' ? reservasHoy : item.to === '/admin/notificaciones' ? alertasVenta : 0;
+                                const badge = item.to === '/admin' ? Math.max(0, reservasHoy - reservasVistasBase) : item.to === '/admin/notificaciones' ? alertasVenta : 0;
                                 return (
                                     <NavLink
                                         key={item.to}

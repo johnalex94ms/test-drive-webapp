@@ -67,12 +67,10 @@ function Acordeon({ titulo, abierto, onToggle, children }: { titulo: string; abi
 }
 
 const ESTADOS_LABEL: Record<string, string> = {
-    pendiente: 'Pendiente',
     confirmada: 'Confirmada',
     en_camino: 'En camino',
     en_prueba: 'En prueba',
     finalizada: 'Finalizada',
-    rechazada: 'Rechazada',
     cancelada: 'Cancelada',
 };
 

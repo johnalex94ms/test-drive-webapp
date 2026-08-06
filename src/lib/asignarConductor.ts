@@ -8,8 +8,9 @@ export async function asignarConductorDisponible(
 ): Promise<string | null> {
     const resConductores = await supabase
         .from('conductores_sedes')
-        .select('conductor_id')
-        .eq('sede_id', sedeId);
+        .select('conductor_id, conductores!inner(activo)')
+        .eq('sede_id', sedeId)
+        .eq('conductores.activo', true);
 
     const candidatos = (resConductores.data || []).map((r: any) => r.conductor_id);
     if (candidatos.length === 0) return null;

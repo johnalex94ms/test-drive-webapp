@@ -189,7 +189,7 @@ export default function VehiculosAdminPage() {
             velocidad_max: v.velocidad_max || '',
             tipo_cambio: v.tipo_cambio || '',
             activo: true,
-            imagenes: v.imagenes_360 || [],
+            imagenes: [],
             fechaIngreso: fechaHoyLocal(),
         });
         setErrorMsg(null);
