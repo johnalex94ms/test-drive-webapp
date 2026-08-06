@@ -87,13 +87,18 @@
     background-color: #f8caca;
 }
 
+.rbc-day-bg.dia-pico-placa {
+    background-color: #fdf3d9;
+}
+
 .rbc-day-bg.dia-libre,
 .rbc-day-bg.dia-ocupado-parcial {
     cursor: pointer;
 }
 
 .rbc-day-bg.dia-lleno,
-.rbc-day-bg.dia-bloqueado {
+.rbc-day-bg.dia-bloqueado,
+.rbc-day-bg.dia-pico-placa {
     cursor: not-allowed;
 }
 
@@ -119,4 +124,14 @@
 
 .rbc-day-bg.dia-bloqueado.dia-clickeable:hover {
     background-color: #f2a8a8;
+}
+
+.rbc-day-bg.dia-admin-libre.rbc-selected-cell,
+.rbc-day-bg.dia-libre.rbc-selected-cell,
+.rbc-day-bg.dia-ocupado-parcial.rbc-selected-cell {
+    background-color: rgba(5, 22, 32, 0.18);
+}
+
+.rbc-day-bg.dia-bloqueado.rbc-selected-cell {
+    background-color: rgba(185, 28, 28, 0.35);
 }

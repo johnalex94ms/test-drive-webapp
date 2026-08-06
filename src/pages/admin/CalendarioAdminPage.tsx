@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ExcelJS from 'exceljs';
-import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, ShipWheel, UserRound, Ban } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, FileSpreadsheet, ShipWheel, UserRound, Ban, Pin, X, Clock, Mail, Phone, Home } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { SelectorFecha } from '../../components/ui/SelectorFecha';
 import { obtenerHorariosDelDia } from '../../lib/horarios';
+import { obtenerFotoCarro } from '../../lib/vehiculoImagenes';
+import { fechaHoyLocal } from '../../lib/fecha';
 
 const ESTILO_ESTADO: Record<string, { bg: string; texto: string; label: string }> = {
     pendiente: { bg: '#fdf3d9', texto: '#8a6d00', label: 'Pendiente' },
@@ -17,7 +19,7 @@ const ESTILO_ESTADO: Record<string, { bg: string; texto: string; label: string }
 };
 
 function hoyISO() {
-    return new Date().toISOString().slice(0, 10);
+    return fechaHoyLocal();
 }
 
 function sumarDias(fechaISO: string, dias: number) {
@@ -50,6 +52,7 @@ export default function CalendarioAdminPage() {
     const [vehiculoFiltro, setVehiculoFiltro] = useState('todos');
     const [conductorFiltro, setConductorFiltro] = useState('todos');
     const [reservaSel, setReservaSel] = useState<any>(null);
+    const [filtrosFijos, setFiltrosFijos] = useState(false);
     const queryClient = useQueryClient();
 
     const sedesQuery = useQuery({
@@ -210,19 +213,24 @@ export default function CalendarioAdminPage() {
                     <h1 className="font-display text-2xl font-bold text-[#051620]">Calendario</h1>
                     <p className="text-sm text-[#666]">Disponibilidad de vehiculos por horario, dia a dia.</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={exportarExcel}
-                    disabled={vehiculos.length === 0}
-                    className="inline-flex items-center gap-2 bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-40"
-                >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Exportar Excel
-                </button>
+                <div className="flex items-center gap-4">
+                    <p className="text-sm text-[#666] capitalize">
+                        {formatearFechaBonita(fecha)}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={exportarExcel}
+                        disabled={vehiculos.length === 0}
+                        className="inline-flex items-center gap-2 bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-40"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        Exportar Excel
+                    </button>
+                </div>
             </div>
 
             {/* Controles */}
-            <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-6 flex items-end gap-4 flex-wrap">
+            <div className={'relative bg-white border border-[#e5e5e5] rounded-sm p-4 pr-10 mb-6 flex items-end gap-4 flex-wrap' + (filtrosFijos ? ' sticky top-0 z-30 shadow-md' : '')}>
                 <div className="flex items-end gap-2">
                     <button
                         type="button"
@@ -317,9 +325,14 @@ export default function CalendarioAdminPage() {
                     <RotateCcw className="w-4 h-4 text-[#666]" />
                 </button>
 
-                <p className="text-sm text-[#666] capitalize ml-auto self-center">
-                    {formatearFechaBonita(fecha)}
-                </p>
+                <button
+                    type="button"
+                    onClick={() => setFiltrosFijos((f) => !f)}
+                    title={filtrosFijos ? 'Dejar de fijar filtros' : 'Fijar filtros al hacer scroll'}
+                    className={'group absolute top-3 right-3 cursor-pointer transition-colors ' + (filtrosFijos ? 'text-amber-600' : 'text-[#666] hover:text-[#051620]')}
+                >
+                    <Pin className="w-4 h-4 nav-icon" fill={filtrosFijos ? 'currentColor' : 'none'} />
+                </button>
             </div>
 
             {/* Leyenda */}
@@ -343,15 +356,15 @@ export default function CalendarioAdminPage() {
                     No hay vehiculos activos para esta sede.
                 </p>
             ) : (
-                <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-x-auto">
+                <div className="bg-white border border-[#e5e5e5] rounded-sm overflow-auto max-h-[70vh] scroll-fino">
                     <table className="w-full text-sm border-collapse">
                         <thead>
                             <tr>
-                                <th className="sticky left-0 bg-[#f8f8f8] text-left text-xs text-[#666] uppercase tracking-wide px-4 py-3 border-b border-[#e5e5e5] min-w-[160px]">
+                                <th className="sticky top-0 left-0 z-20 bg-[#051620] text-left text-xs text-white uppercase tracking-wide px-4 py-3 border-b border-[#051620] min-w-[160px]">
                                     Vehiculo
                                 </th>
                                 {obtenerHorariosDelDia(fecha).map((h) => (
-                                    <th key={h} className="text-center text-xs text-[#666] uppercase tracking-wide px-2 py-3 border-b border-l border-[#e5e5e5] min-w-[110px]">
+                                    <th key={h} className="sticky top-0 z-10 bg-[#051620] text-center text-xs text-white uppercase tracking-wide px-2 py-3 border-b border-l border-white/10 min-w-[110px]">
                                         {h}
                                     </th>
                                 ))}
@@ -362,84 +375,95 @@ export default function CalendarioAdminPage() {
                                 const bloqueo = bloqueosPorVehiculo[v.id];
                                 const horarios = obtenerHorariosDelDia(fecha);
                                 return (
-                                <tr key={v.id} className="border-t border-[#e5e5e5]">
-                                    <td className="sticky left-0 bg-white px-4 py-2 border-r border-[#e5e5e5]">
-                                        <p className="font-medium text-[#051620] text-sm">KIA {v.modelo}</p>
-                                        <p className="text-xs text-[#999]">{v.placa} · {v.sedes ? v.sedes.nombre : ''}</p>
-                                    </td>
-                                    {bloqueo ? (
-                                        <td colSpan={horarios.length} className="border-l border-[#e5e5e5] p-1.5 align-top">
-                                            <div
-                                                className="w-full h-[42px] rounded-sm bg-red-50 border border-red-100 flex items-center gap-2 px-3"
-                                                title={bloqueo.motivo}
-                                            >
-                                                <Ban className="w-4 h-4 text-red-600 flex-shrink-0" />
-                                                <span className="text-xs font-medium text-red-700 truncate">{bloqueo.motivo}</span>
+                                    <tr key={v.id} className="border-t border-[#e5e5e5]">
+                                        <td className="sticky left-0 z-10 bg-white px-4 py-2 border-r border-[#e5e5e5]">
+                                            <div className="flex items-center gap-2.5">
+                                                {obtenerFotoCarro(v.modelo) && (
+                                                    <img
+                                                        src={obtenerFotoCarro(v.modelo)}
+                                                        alt={v.modelo}
+                                                        className="w-10 h-10 object-contain flex-shrink-0"
+                                                    />
+                                                )}
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-[#051620] text-sm">KIA {v.modelo}</p>
+                                                    <p className="text-xs text-[#999] truncate">{v.placa} · {v.sedes ? v.sedes.nombre : ''}</p>
+                                                </div>
                                             </div>
                                         </td>
-                                    ) : horarios.map((h) => {
-                                        const reserva = buscarReserva(v.id, h);
-                                        const estilo = reserva ? ESTILO_ESTADO[reserva.estado] : null;
-                                        return (
-                                            <td key={h} className="border-l border-[#e5e5e5] p-1.5 align-top">
-                                                {reserva ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setReservaSel(reserva)}
-                                                        className="w-full text-left rounded-sm px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1.5"
-                                                        style={{ background: estilo!.bg }}
-                                                    >
-                                                        {(() => {
-                                                            const esConductor = !!reserva.conductores;
-                                                            const persona = reserva.conductores || (reserva.conducido_por_asesor ? reserva.asesores : null);
-                                                            const IconoRol = esConductor ? ShipWheel : UserRound;
-                                                            if (!persona) return null;
-                                                            return (
-                                                                <div className="relative flex-shrink-0">
-                                                                    {persona.foto_url ? (
-                                                                        <img
-                                                                            src={persona.foto_url}
-                                                                            alt={persona.nombre}
-                                                                            className="w-6 h-6 rounded-full object-cover"
-                                                                        />
-                                                                    ) : (
-                                                                        <div
-                                                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
-                                                                            style={{ background: estilo!.texto, color: '#fff' }}
-                                                                        >
-                                                                            {iniciales(persona.nombre)}
-                                                                        </div>
-                                                                    )}
-                                                                    <div
-                                                                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full flex items-center justify-center border border-white"
-                                                                        style={{ background: estilo!.texto }}
-                                                                        title={esConductor ? 'Conductor' : 'Asesor comercial'}
-                                                                    >
-                                                                        <IconoRol className="w-2 h-2 text-white" strokeWidth={3} />
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                        <div className="min-w-0">
-                                                            <p className="text-[11px] font-semibold truncate" style={{ color: estilo!.texto }}>
-                                                                {reserva.cliente_nombre}
-                                                            </p>
-                                                            <p className="text-[10px] truncate" style={{ color: estilo!.texto, opacity: 0.8 }}>
-                                                                {reserva.conductores
-                                                                    ? reserva.conductores.nombre
-                                                                    : reserva.conducido_por_asesor
-                                                                        ? (reserva.asesores ? reserva.asesores.nombre + ' (asesor)' : 'Asesor comercial')
-                                                                        : 'Sin conductor'}
-                                                            </p>
-                                                        </div>
-                                                    </button>
-                                                ) : (
-                                                    <div className="w-full h-[42px] rounded-sm bg-[#f8f8f8]" />
-                                                )}
+                                        {bloqueo ? (
+                                            <td colSpan={horarios.length} className="border-l border-[#e5e5e5] p-1.5 align-top">
+                                                <div
+                                                    className="w-full h-[42px] rounded-sm bg-red-50 border border-red-100 flex items-center gap-2 px-3"
+                                                    title={bloqueo.motivo}
+                                                >
+                                                    <Ban className="w-4 h-4 text-red-600 flex-shrink-0" />
+                                                    <span className="text-xs font-medium text-red-700 truncate">{bloqueo.motivo}</span>
+                                                </div>
                                             </td>
-                                        );
-                                    })}
-                                </tr>
+                                        ) : horarios.map((h) => {
+                                            const reserva = buscarReserva(v.id, h);
+                                            const estilo = reserva ? ESTILO_ESTADO[reserva.estado] : null;
+                                            return (
+                                                <td key={h} className="border-l border-[#e5e5e5] p-1.5 align-top">
+                                                    {reserva ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setReservaSel(reserva)}
+                                                            className="w-full text-left rounded-sm px-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1.5"
+                                                            style={{ background: estilo!.bg }}
+                                                        >
+                                                            {(() => {
+                                                                const esConductor = !!reserva.conductores;
+                                                                const persona = reserva.conductores || (reserva.conducido_por_asesor ? reserva.asesores : null);
+                                                                const IconoRol = esConductor ? ShipWheel : UserRound;
+                                                                if (!persona) return null;
+                                                                return (
+                                                                    <div className="relative flex-shrink-0">
+                                                                        {persona.foto_url ? (
+                                                                            <img
+                                                                                src={persona.foto_url}
+                                                                                alt={persona.nombre}
+                                                                                className="w-6 h-6 rounded-full object-cover"
+                                                                            />
+                                                                        ) : (
+                                                                            <div
+                                                                                className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
+                                                                                style={{ background: estilo!.texto, color: '#fff' }}
+                                                                            >
+                                                                                {iniciales(persona.nombre)}
+                                                                            </div>
+                                                                        )}
+                                                                        <div
+                                                                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full flex items-center justify-center border border-white"
+                                                                            style={{ background: estilo!.texto }}
+                                                                            title={esConductor ? 'Conductor' : 'Asesor comercial'}
+                                                                        >
+                                                                            <IconoRol className="w-2 h-2 text-white" strokeWidth={3} />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                            <div className="min-w-0">
+                                                                <p className="text-[11px] font-semibold truncate" style={{ color: estilo!.texto }}>
+                                                                    {reserva.cliente_nombre}
+                                                                </p>
+                                                                <p className="text-[10px] truncate" style={{ color: estilo!.texto, opacity: 0.8 }}>
+                                                                    {reserva.conductores
+                                                                        ? reserva.conductores.nombre
+                                                                        : reserva.conducido_por_asesor
+                                                                            ? (reserva.asesores ? reserva.asesores.nombre + ' (asesor)' : 'Asesor comercial')
+                                                                            : 'Sin conductor'}
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    ) : (
+                                                        <div className="w-full h-[42px] rounded-sm bg-[#f8f8f8]" />
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
                                 );
                             })}
                         </tbody>
@@ -466,18 +490,33 @@ export default function CalendarioAdminPage() {
                                 onClick={() => setReservaSel(null)}
                                 className="text-[#666] hover:text-[#051620] cursor-pointer"
                             >
-                                X
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
                         <p className="font-display text-lg font-bold text-[#051620]">
                             {reservaSel.cliente_nombre} {reservaSel.cliente_apellido}
                         </p>
-                        <div className="text-sm text-[#666] mt-3 flex flex-col gap-1">
-                            <p><strong className="text-[#051620]">Hora:</strong> {reservaSel.hora_inicio.slice(0, 5)} - {reservaSel.hora_fin.slice(0, 5)}</p>
-                            <p><strong className="text-[#051620]">Correo:</strong> {reservaSel.cliente_correo}</p>
-                            <p><strong className="text-[#051620]">Celular:</strong> {reservaSel.cliente_celular}</p>
-                            <p><strong className="text-[#051620]">Conductor:</strong> {reservaSel.conductores ? reservaSel.conductores.nombre : (reservaSel.conducido_por_asesor ? 'La hace el asesor: ' + (reservaSel.asesores ? reservaSel.asesores.nombre : 'Sin dato') : 'Sin asignar')}</p>
-                            <p><strong className="text-[#051620]">Entrega:</strong> {reservaSel.tipo_entrega === 'domicilio' ? 'A domicilio' : 'En sede'}</p>
+                        <div className="text-sm text-[#666] mt-3 flex flex-col gap-2">
+                            <p className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-[#999] flex-shrink-0" />
+                                <span><strong className="text-[#051620]">Hora:</strong> {reservaSel.hora_inicio.slice(0, 5)} - {reservaSel.hora_fin.slice(0, 5)}</span>
+                            </p>
+                            <p className="flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-[#999] flex-shrink-0" />
+                                <span><strong className="text-[#051620]">Correo:</strong> {reservaSel.cliente_correo}</span>
+                            </p>
+                            <p className="flex items-center gap-2">
+                                <Phone className="w-4 h-4 text-[#999] flex-shrink-0" />
+                                <span><strong className="text-[#051620]">Celular:</strong> {reservaSel.cliente_celular}</span>
+                            </p>
+                            <p className="flex items-center gap-2">
+                                <ShipWheel className="w-4 h-4 text-[#999] flex-shrink-0" />
+                                <span><strong className="text-[#051620]">Conductor:</strong> {reservaSel.conductores ? reservaSel.conductores.nombre : (reservaSel.conducido_por_asesor ? 'La hace el asesor: ' + (reservaSel.asesores ? reservaSel.asesores.nombre : 'Sin dato') : 'Sin asignar')}</span>
+                            </p>
+                            <p className="flex items-center gap-2">
+                                <Home className="w-4 h-4 text-[#999] flex-shrink-0" />
+                                <span><strong className="text-[#051620]">Lugar:</strong> {reservaSel.tipo_entrega === 'domicilio' ? 'A domicilio' : 'En sede'}</span>
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { DIAS_SEMANA_PICO_PLACA, diasBloqueadosPorPlaca, digitosDelDia, type DiaPicoPlaca } from '../../lib/picoPlaca';
 import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
 import { debeInactivarse, textoCuentaRegresiva } from '../../lib/programacionInactivacion';
+import { fechaHoyLocal } from '../../lib/fecha';
 
 const CATEGORIAS = [
     { value: 'automovil', label: 'Automovil' },
@@ -51,7 +52,7 @@ function formVacio(sedeDefault: string): VehiculoForm {
         tipo_cambio: '',
         activo: true,
         imagenes: [],
-        fechaIngreso: new Date().toISOString().slice(0, 10),
+        fechaIngreso: fechaHoyLocal(),
     };
 }
 
@@ -170,7 +171,7 @@ export default function VehiculosAdminPage() {
             tipo_cambio: v.tipo_cambio || '',
             activo: v.activo,
             imagenes: v.imagenes_360 || [],
-            fechaIngreso: v.fecha_ingreso || new Date().toISOString().slice(0, 10),
+            fechaIngreso: v.fecha_ingreso || fechaHoyLocal(),
         });
         setErrorMsg(null);
         setModalAbierto(true);
@@ -189,7 +190,7 @@ export default function VehiculosAdminPage() {
             tipo_cambio: v.tipo_cambio || '',
             activo: true,
             imagenes: v.imagenes_360 || [],
-            fechaIngreso: new Date().toISOString().slice(0, 10),
+            fechaIngreso: fechaHoyLocal(),
         });
         setErrorMsg(null);
         setModalAbierto(true);
@@ -456,10 +457,6 @@ export default function VehiculosAdminPage() {
                 >
                     <RotateCcw className="w-4 h-4 text-[#666]" />
                 </button>
-
-                <p className="text-xs text-[#999] whitespace-nowrap pb-2">
-                    {vehiculos.length} de {vehiculosBase.length}
-                </p>
             </div>
 
             {vehiculosQuery.isLoading ? (
@@ -488,7 +485,7 @@ export default function VehiculosAdminPage() {
                             </thead>
                             <tbody>
                                 {vehiculosPagina.map((v: any) => {
-                                    const diasVehiculo = diasBloqueadosPorPlaca(v.placa, picoPlacaConfig);
+                                    const diasVehiculo = diasBloqueadosPorPlaca(v.placa, picoPlacaConfig, v.categoria);
                                     const bloqueadoHoy = diasVehiculo.includes(new Date().getDay());
                                     const listoParaVenta = v.activo && estaListoParaVenta(v.fecha_ingreso);
                                     const estiloSombreado = listoParaVenta
@@ -586,11 +583,11 @@ export default function VehiculosAdminPage() {
                         </table>
                     </div>
 
-                    {totalPaginas > 1 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <p className="text-xs text-[#666]">
-                                Pagina {pagina} de {totalPaginas}
-                            </p>
+                    <div className="flex items-center justify-between mt-4">
+                        <p className="text-xs text-[#999]">
+                            {totalPaginas > 1 ? 'Pagina ' + pagina + ' de ' + totalPaginas + ' | ' : ''}{vehiculos.length} de {vehiculosBase.length}
+                        </p>
+                        {totalPaginas > 1 && (
                             <div className="flex gap-2">
                                 <button
                                     type="button"
@@ -609,8 +606,8 @@ export default function VehiculosAdminPage() {
                                     <ChevronRight className="w-4 h-4 text-[#051620]" />
                                 </button>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </>
             )}
 
@@ -795,7 +792,7 @@ export default function VehiculosAdminPage() {
                         </div>
 
                         {form.placa && (() => {
-                            const dias = diasBloqueadosPorPlaca(form.placa, picoPlacaConfig);
+                            const dias = diasBloqueadosPorPlaca(form.placa, picoPlacaConfig, form.categoria);
                             return dias.length > 0 ? (
                                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-sm px-3 py-2 mb-4">
                                     Pico y placa: esta placa queda bloqueada los {DIAS_SEMANA_PICO_PLACA.filter((d) => dias.includes(d.value)).map((d) => d.label).join(', ')}. Se calcula automatico segun la <a href="/admin/pico-placa" className="underline">configuracion vigente</a>.

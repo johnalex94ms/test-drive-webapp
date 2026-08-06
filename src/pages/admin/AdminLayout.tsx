@@ -5,6 +5,7 @@ import { Bell, BellRing, BellOff, ClipboardList, CalendarDays, Users, UserRound,
 import { supabase } from '../../lib/supabaseClient';
 import { useAdminStore } from '../../store/adminStore';
 import { estaListoParaVenta } from '../../lib/vidaUtilVehiculo';
+import { fechaHoyLocal } from '../../lib/fecha';
 import iconoNotificacion from '../../assets/images/notificaciones/imagen_notificacion_nuevo_test_drive.webp';
 import logoDistrikia from '../../assets/images/logos/logotipo-distrikia-blanco.webp';
 import logoDistridrive from '../../assets/images/logos/logotipo-distridrive.png';
@@ -37,7 +38,7 @@ const NAV: (NavLinkItem | NavGroupItem)[] = [
     { type: 'link', to: '/admin', label: 'Reservas', icon: ClipboardList },
     { type: 'link', to: '/admin/calendario', label: 'Calendario', icon: CalendarDays },
     {
-        type: 'group', label: 'Flota', icon: Car, children: [
+        type: 'group', label: 'Vehiculos', icon: Car, children: [
             { to: '/admin/vehiculos', label: 'Vehiculos', icon: Car },
             { to: '/admin/pico-placa', label: 'Pico y placa', icon: CalendarClock },
             { to: '/admin/dias-bloqueados', label: 'Dias bloqueados', icon: Ban },
@@ -241,7 +242,7 @@ export default function AdminLayout() {
     }
 
     async function cargarReservasHoy() {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = fechaHoyLocal();
         const res = await supabase
             .from('reservas')
             .select('id', { count: 'exact', head: true })

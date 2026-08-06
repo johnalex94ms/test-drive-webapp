@@ -237,8 +237,8 @@ export default function ReservasAdminPage() {
             {/* Modal de detalle */}
             {seleccionada && !accion && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-[#e5e5e5] flex items-center justify-between">
+                    <div className="bg-white rounded-sm max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="p-5 border-b border-[#e5e5e5] flex items-center justify-between flex-shrink-0">
                             <div>
                                 <p className="text-xs text-[#666]">{seleccionada.vehiculos ? 'KIA ' + seleccionada.vehiculos.modelo : ''}</p>
                                 <p className="font-display text-xl font-bold text-[#051620]">
@@ -254,7 +254,7 @@ export default function ReservasAdminPage() {
                             </button>
                         </div>
 
-                        <div className="p-6 grid md:grid-cols-2 gap-6">
+                        <div className="p-6 grid md:grid-cols-2 gap-6 overflow-y-auto scroll-fino flex-1">
                             <div>
                                 <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-2">Datos del cliente</p>
                                 <div className="text-sm text-[#051620] flex flex-col gap-1 mb-4">
@@ -394,7 +394,7 @@ export default function ReservasAdminPage() {
                             </div>
                         </div>
 
-                        <div className="p-5 border-t border-[#e5e5e5] flex items-center justify-between gap-3">
+                        <div className="p-5 border-t border-[#e5e5e5] flex items-center justify-between gap-3 flex-shrink-0">
                             {['confirmada', 'en_camino', 'en_prueba'].includes(seleccionada.estado) && (
                                 <button
                                     type="button"

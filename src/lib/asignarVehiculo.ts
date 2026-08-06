@@ -5,6 +5,7 @@ import { vehiculoBloqueadoEnFecha, type VehiculoBloqueo } from './vehiculosBloqu
 interface VehiculoCandidato {
     id: string;
     placa: string;
+    categoria?: string | null;
 }
 
 export function vehiculosDisponiblesEseDia(
@@ -15,7 +16,7 @@ export function vehiculosDisponiblesEseDia(
 ): VehiculoCandidato[] {
     const diaSemana = new Date(fecha + 'T00:00:00').getDay();
     return pool.filter((v) =>
-        !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana) &&
+        !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig, v.categoria).includes(diaSemana) &&
         !vehiculoBloqueadoEnFecha(v.id, fecha, bloqueos)
     );
 }

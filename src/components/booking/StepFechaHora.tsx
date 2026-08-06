@@ -38,7 +38,8 @@ function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any, diasP
     const date = props.date;
     const diaStr = format(date, 'yyyy-MM-dd');
     const bloqueado = esDiaBloqueado(date, diasCompletos, diasPicoPlaca, fechasBloqueadas);
-    const motivo = fechasBloqueadas[diaStr];
+    const esPicoPlaca = diasPicoPlaca.includes(date.getDay());
+    const motivo = fechasBloqueadas[diaStr] || (esPicoPlaca ? 'Pico y placa' : undefined);
 
     return (
         <button
@@ -50,7 +51,7 @@ function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any, diasP
                 height: '100%',
                 minHeight: 26,
                 background: 'transparent',
-                color: bloqueado ? '#999' : '#051620',
+                color: esPicoPlaca ? '#8a6d00' : bloqueado ? '#999' : '#051620',
                 border: 'none',
                 cursor: bloqueado ? 'not-allowed' : 'pointer',
                 display: 'flex',
@@ -70,7 +71,7 @@ function DiaPersonalizado(props: any, onDiaClick: any, diasCompletos: any, diasP
                         fontSize: 9,
                         fontWeight: 500,
                         lineHeight: 1.15,
-                        color: '#999',
+                        color: esPicoPlaca ? '#8a6d00' : '#999',
                         opacity: 0.9,
                         maxWidth: '100%',
                         whiteSpace: 'normal',
@@ -98,7 +99,8 @@ function getDayPropGetter(ocupadosPorDia: any, diasCompletos: any, diasPicoPlaca
         const completo = !!diasCompletos[diaStr];
         const conOcupacion = ocupadosPorDia[diaStr] && ocupadosPorDia[diaStr].length > 0;
 
-        if (esPasado || esDomingo || esPicoPlaca || esFechaBloqueada) return { className: 'dia-lleno' };
+        if (esPicoPlaca) return { className: 'dia-pico-placa' };
+        if (esPasado || esDomingo || esFechaBloqueada) return { className: 'dia-lleno' };
         if (completo) return { className: 'dia-bloqueado' };
         if (conOcupacion) return { className: 'dia-ocupado-parcial' };
         return { className: 'dia-libre' };
@@ -146,7 +148,7 @@ export function StepFechaHora() {
         queryFn: async () => {
             const res = await supabase
                 .from('vehiculos')
-                .select('id, placa, sede_id')
+                .select('id, placa, sede_id, categoria')
                 .eq('sede_id', vehiculo!.sede_id)
                 .eq('activo', true);
             return res.data || [];
@@ -247,9 +249,9 @@ export function StepFechaHora() {
     const picoPlacaConfig = picoPlacaConfigQuery.data || [];
     const vehiculosBloqueados = vehiculosBloqueadosQuery.data || [];
 
-    // Un dia solo queda bloqueado por pico y placa si TODAS las unidades de la sede estan restringidas ese dia
-    const diasPicoPlaca = poolSede.reduce((dias: number[] | null, v: any) => {
-        const propios = diasBloqueadosPorPlaca(v.placa, picoPlacaConfig);
+    // Un dia queda bloqueado por pico y placa si TODAS las unidades del MODELO elegido estan restringidas ese dia
+    const diasPicoPlaca = pool.reduce((dias: number[] | null, v: any) => {
+        const propios = diasBloqueadosPorPlaca(v.placa, picoPlacaConfig, v.categoria);
         if (dias === null) return propios;
         return dias.filter((d) => propios.includes(d));
     }, null as number[] | null) || [];
@@ -262,7 +264,7 @@ export function StepFechaHora() {
     function unidadesDisponiblesEseDia(diaStr: string) {
         const diaSemana = new Date(diaStr + 'T00:00:00').getDay();
         return poolSede.filter((v: any) =>
-            !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig).includes(diaSemana) &&
+            !diasBloqueadosPorPlaca(v.placa, picoPlacaConfig, v.categoria).includes(diaSemana) &&
             !vehiculoBloqueadoEnFecha(v.id, diaStr, vehiculosBloqueados)
         ).length;
     }
@@ -359,7 +361,7 @@ export function StepFechaHora() {
                     Elige fecha y hora
                 </h2>
                 <p className="text-[#666666] mt-2">
-                    Verde: disponible. Rojo claro: con algunos horarios ocupados. Rojo fuerte: sin cupo. Gris: no disponible.
+                    Verde: disponible. Rojo claro: con algunos horarios ocupados. Rojo fuerte: sin cupo. Ambar: pico y placa. Gris: no disponible.
                 </p>
             </div>
 
@@ -407,6 +409,9 @@ export function StepFechaHora() {
                 </span>
                 <span className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-sm" style={{ background: '#f8caca' }} /> Sin cupo
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm" style={{ background: '#fdf3d9' }} /> Pico y placa
                 </span>
                 <span className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-sm" style={{ background: '#fafafa' }} /> No disponible

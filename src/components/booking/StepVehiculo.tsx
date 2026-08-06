@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Car } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useBookingStore } from '../../store/bookingStore';
+import { diasBloqueadosPorPlaca, type DiaPicoPlaca } from '../../lib/picoPlaca';
 
 const CATEGORIAS = [
     { key: 'todos', label: 'Todos' },
@@ -33,6 +35,7 @@ interface VehiculoConSpecs {
     imagenes_360?: string[];
     sede_id: string;
     activo: boolean;
+    placa: string;
 }
 
 interface ModeloAgrupado {
@@ -44,6 +47,8 @@ interface ModeloAgrupado {
     tipo_cambio?: string;
     imagenes_360?: string[];
     cantidadSedes: number;
+    cantidadUnidades: number;
+    enPicoPlacaHoy: number;
 }
 
 export function StepVehiculo() {
@@ -64,6 +69,16 @@ export function StepVehiculo() {
         },
     });
 
+    const picoPlacaConfigQuery = useQuery({
+        queryKey: ['pico-placa-config'],
+        queryFn: async () => {
+            const res = await supabase.from('pico_placa_config').select('*').order('dia_semana');
+            return (res.data || []) as DiaPicoPlaca[];
+        },
+    });
+    const picoPlacaConfig = picoPlacaConfigQuery.data || [];
+    const diaSemanaHoy = new Date().getDay();
+
     const modelosAgrupados = useMemo(() => {
         const mapa: Record<string, VehiculoConSpecs[]> = {};
         vehiculos.forEach((v) => {
@@ -73,6 +88,9 @@ export function StepVehiculo() {
 
         return Object.entries(mapa).map(([nombreModelo, unidades]): ModeloAgrupado => {
             const representante = unidades[0];
+            const enPicoPlacaHoy = unidades.filter((v) =>
+                diasBloqueadosPorPlaca(v.placa, picoPlacaConfig, v.categoria).includes(diaSemanaHoy)
+            ).length;
             return {
                 modelo: nombreModelo,
                 categoria: representante.categoria,
@@ -82,9 +100,11 @@ export function StepVehiculo() {
                 tipo_cambio: representante.tipo_cambio,
                 imagenes_360: representante.imagenes_360,
                 cantidadSedes: unidades.length,
+                cantidadUnidades: unidades.length,
+                enPicoPlacaHoy,
             };
         }).sort((a, b) => a.modelo.localeCompare(b.modelo));
-    }, [vehiculos]);
+    }, [vehiculos, picoPlacaConfig, diaSemanaHoy]);
 
     const filtrados = categoriaFiltro === 'todos'
         ? modelosAgrupados
@@ -161,6 +181,17 @@ export function StepVehiculo() {
                                 <div className="px-3 py-2.5 bg-white border-t border-[#e5e5e5]">
                                     <p className="font-display text-base font-bold text-[#051620]">{m.modelo}</p>
                                     <p className="text-xs capitalize text-[#666] mt-0.5">{m.categoria}</p>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-[#999]">
+                                            <Car className="w-3 h-3" />
+                                            {m.cantidadUnidades} {m.cantidadUnidades === 1 ? 'unidad' : 'unidades'}
+                                        </span>
+                                        {m.enPicoPlacaHoy > 0 && (
+                                            <span className="text-[11px] font-medium text-red-600">
+                                                {m.enPicoPlacaHoy} en pico y placa
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

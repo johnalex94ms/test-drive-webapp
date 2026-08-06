@@ -327,10 +327,6 @@ export default function AsesoresAdminPage() {
                 >
                     <RotateCcw className="w-4 h-4 text-[#666]" />
                 </button>
-
-                <p className="text-xs text-[#999] whitespace-nowrap pb-2">
-                    {asesores.length} de {asesoresBase.length}
-                </p>
             </div>
 
             {asesoresQuery.isLoading ? (
@@ -395,11 +391,11 @@ export default function AsesoresAdminPage() {
                         </table>
                     </div>
 
-                    {totalPaginas > 1 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <p className="text-xs text-[#666]">
-                                Pagina {pagina} de {totalPaginas}
-                            </p>
+                    <div className="flex items-center justify-between mt-4">
+                        <p className="text-xs text-[#999]">
+                            {totalPaginas > 1 ? 'Pagina ' + pagina + ' de ' + totalPaginas + ' | ' : ''}{asesores.length} de {asesoresBase.length}
+                        </p>
+                        {totalPaginas > 1 && (
                             <div className="flex gap-2">
                                 <button
                                     type="button"
@@ -418,8 +414,8 @@ export default function AsesoresAdminPage() {
                                     <ChevronRight className="w-4 h-4 text-[#051620]" />
                                 </button>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </>
             )}
 

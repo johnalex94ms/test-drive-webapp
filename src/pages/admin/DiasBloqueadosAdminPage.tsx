@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calendar, dateFnsLocalizer, type View } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../../styles/booking-calendar.css';
-import { Trash2, Ban } from 'lucide-react';
+import { Trash2, Ban, CalendarClock, X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
+import { fechaHoyLocal } from '../../lib/fecha';
 
 const localizer = dateFnsLocalizer({
     format,
@@ -18,7 +19,7 @@ const localizer = dateFnsLocalizer({
 });
 
 function hoyISO() {
-    return new Date().toISOString().slice(0, 10);
+    return fechaHoyLocal();
 }
 
 function DiaPersonalizado(props: any, diasBloqueados: Record<string, string>, onDiaClick: (dia: string) => void) {
@@ -93,7 +94,30 @@ export default function DiasBloqueadosAdminPage() {
     const [motivoBloqueo, setMotivoBloqueo] = useState('');
     const [intentoBloquear, setIntentoBloquear] = useState(false);
     const [intentoAgregarLateral, setIntentoAgregarLateral] = useState(false);
+    const [panelAbierto, setPanelAbierto] = useState(false);
+    const [cerrandoPanel, setCerrandoPanel] = useState(false);
     const queryClient = useQueryClient();
+
+    function abrirPanel() {
+        setPanelAbierto(true);
+    }
+
+    function cerrarPanel() {
+        setCerrandoPanel(true);
+        setTimeout(() => {
+            setPanelAbierto(false);
+            setCerrandoPanel(false);
+        }, 260);
+    }
+
+    useEffect(() => {
+        if (!panelAbierto) return;
+        const overflowPrevio = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = overflowPrevio;
+        };
+    }, [panelAbierto]);
 
     const diasQuery = useQuery({
         queryKey: ['admin-dias-bloqueados'],
@@ -210,127 +234,155 @@ export default function DiasBloqueadosAdminPage() {
 
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="font-display text-2xl font-bold text-[#051620]">Dias bloqueados</h1>
-                <p className="text-sm text-[#666]">
-                    Festivos y fechas especiales sin test drive. Estos dias quedan bloqueados para todos los vehiculos en el agendamiento, igual que los domingos.
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="font-display text-2xl font-bold text-[#051620]">Dias bloqueados</h1>
+                    <p className="text-sm text-[#666]">
+                        Festivos y fechas especiales sin test drive. Estos dias quedan bloqueados para todos los vehiculos en el agendamiento, igual que los domingos.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={abrirPanel}
+                    className="inline-flex items-center gap-2 bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] flex-shrink-0"
+                >
+                    <CalendarClock className="w-4 h-4" />
+                    Fechas bloqueadas ({dias.length})
+                </button>
+            </div>
+
+            <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
+                <Calendar
+                    localizer={localizer}
+                    culture="es"
+                    events={[]}
+                    startAccessor="start"
+                    endAccessor="end"
+                    views={['month']}
+                    view={vista}
+                    onView={setVista}
+                    date={fechaVisible}
+                    onNavigate={setFechaVisible}
+                    selectable={true}
+                    longPressThreshold={150}
+                    onSelectSlot={onSeleccionCalendario}
+                    formats={{
+                        monthHeaderFormat: (date: Date) => format(date, 'MMMM yyyy', { locale: es }),
+                        weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
+                    }}
+                    dayPropGetter={getDayPropGetter(diasBloqueados)}
+                    components={{
+                        month: {
+                            dateHeader: (props: any) => DiaPersonalizado(props, diasBloqueados, onDiaClickCalendario),
+                        },
+                    }}
+                    style={{ height: 'calc(100vh - 220px)' }}
+                    messages={{
+                        month: 'Mes', today: 'Hoy', previous: 'Anterior', next: 'Siguiente',
+                    }}
+                />
+                <p className="text-xs text-[#999] mt-3">
+                    Click en un dia libre para bloquearlo, o arrastra el mouse sobre varios dias para bloquearlos juntos. Click en un dia bloqueado (rojo) para desbloquearlo.
                 </p>
             </div>
 
-            <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-                <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
-                    <Calendar
-                        localizer={localizer}
-                        culture="es"
-                        events={[]}
-                        startAccessor="start"
-                        endAccessor="end"
-                        views={['month']}
-                        view={vista}
-                        onView={setVista}
-                        date={fechaVisible}
-                        onNavigate={setFechaVisible}
-                        selectable={true}
-                        longPressThreshold={150}
-                        onSelectSlot={onSeleccionCalendario}
-                        formats={{
-                            monthHeaderFormat: (date: Date) => format(date, 'MMMM yyyy', { locale: es }),
-                            weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
-                        }}
-                        dayPropGetter={getDayPropGetter(diasBloqueados)}
-                        components={{
-                            month: {
-                                dateHeader: (props: any) => DiaPersonalizado(props, diasBloqueados, onDiaClickCalendario),
-                            },
-                        }}
-                        style={{ height: 560 }}
-                        messages={{
-                            month: 'Mes', today: 'Hoy', previous: 'Anterior', next: 'Siguiente',
-                        }}
+            {/* Panel lateral: agregar fecha + fechas bloqueadas */}
+            {panelAbierto && (
+                <>
+                    <div
+                        className={'fixed inset-0 z-50 bg-black/50' + (cerrandoPanel ? ' animate-fade-out-backdrop' : '')}
+                        onClick={cerrarPanel}
                     />
-                    <p className="text-xs text-[#999] mt-3">
-                        Click en un dia libre para bloquearlo, o arrastra el mouse sobre varios dias para bloquearlos juntos. Click en un dia bloqueado (rojo) para desbloquearlo.
-                    </p>
-                </div>
-
-                <div>
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4 mb-4">
-                        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
-                            Agregar fecha
-                        </p>
-                        <div className="flex flex-col gap-3">
-                            <Input
-                                type="date"
-                                value={nuevaFecha}
-                                onChange={(e) => setNuevaFecha(e.target.value)}
-                            />
-                            <div>
-                                <Input
-                                    type="text"
-                                    placeholder="Motivo (ej. Navidad)"
-                                    value={nuevoMotivo}
-                                    onChange={(e) => setNuevoMotivo(e.target.value)}
-                                    maxLength={60}
-                                />
-                                {intentoAgregarLateral && !nuevoMotivo.trim() && (
-                                    <p className="text-xs text-red-600 mt-1">El motivo es obligatorio.</p>
-                                )}
-                            </div>
+                    <div className={'fixed inset-y-0 right-0 z-[60] w-full sm:w-[420px] bg-white shadow-2xl overflow-y-auto scroll-fino ' + (cerrandoPanel ? 'animate-slide-out-right' : 'animate-slide-in-right')}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e5e5]">
+                            <p className="font-display text-lg font-bold text-[#051620]">Fechas bloqueadas</p>
                             <button
                                 type="button"
-                                disabled={guardando}
-                                onClick={() => {
-                                    setIntentoAgregarLateral(true);
-                                    if (!nuevoMotivo.trim()) return;
-                                    agregarDia(nuevaFecha, nuevoMotivo);
-                                    setIntentoAgregarLateral(false);
-                                }}
-                                className="bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                                onClick={cerrarPanel}
+                                className="text-[#666] hover:text-[#051620] cursor-pointer"
                             >
-                                {guardando ? 'Guardando...' : 'Bloquear fecha'}
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
-                        {errorMsg && (
-                            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-3 py-2 mt-3">
-                                {errorMsg}
-                            </p>
-                        )}
-                    </div>
 
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
-                        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
-                            Fechas bloqueadas ({dias.length})
-                        </p>
-                        {diasQuery.isLoading ? (
-                            <p className="text-sm text-[#666]">Cargando...</p>
-                        ) : dias.length === 0 ? (
-                            <p className="text-sm text-[#666]">No hay fechas bloqueadas todavia.</p>
-                        ) : (
-                            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-3 pb-4">
-                                {dias.map((d: any) => (
-                                    <div key={d.fecha} className="flex items-center justify-between gap-3 border border-[#e5e5e5] rounded-sm px-3 py-2">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-[#051620]">{d.fecha}</p>
-                                            <p className="text-xs text-[#666] truncate">{d.motivo}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFechaAEliminar(d)}
-                                            className="text-red-600 hover:text-red-700 cursor-pointer flex-shrink-0"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                        <div className="p-5">
+                            <div className="bg-[#f8f8f8] border border-[#e5e5e5] rounded-sm p-4 mb-4">
+                                <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
+                                    Agregar fecha
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <Input
+                                        type="date"
+                                        value={nuevaFecha}
+                                        onChange={(e) => setNuevaFecha(e.target.value)}
+                                    />
+                                    <div>
+                                        <Input
+                                            type="text"
+                                            placeholder="Motivo (ej. Navidad)"
+                                            value={nuevoMotivo}
+                                            onChange={(e) => setNuevoMotivo(e.target.value)}
+                                            maxLength={60}
+                                        />
+                                        {intentoAgregarLateral && !nuevoMotivo.trim() && (
+                                            <p className="text-xs text-red-600 mt-1">El motivo es obligatorio.</p>
+                                        )}
                                     </div>
-                                ))}
+                                    <button
+                                        type="button"
+                                        disabled={guardando}
+                                        onClick={() => {
+                                            setIntentoAgregarLateral(true);
+                                            if (!nuevoMotivo.trim()) return;
+                                            agregarDia(nuevaFecha, nuevoMotivo);
+                                            setIntentoAgregarLateral(false);
+                                        }}
+                                        className="bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] disabled:opacity-50"
+                                    >
+                                        {guardando ? 'Guardando...' : 'Bloquear fecha'}
+                                    </button>
+                                </div>
+                                {errorMsg && (
+                                    <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-3 py-2 mt-3">
+                                        {errorMsg}
+                                    </p>
+                                )}
                             </div>
-                        )}
+
+                            <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
+                                Fechas bloqueadas ({dias.length})
+                            </p>
+                            {diasQuery.isLoading ? (
+                                <p className="text-sm text-[#666]">Cargando...</p>
+                            ) : dias.length === 0 ? (
+                                <p className="text-sm text-[#666]">No hay fechas bloqueadas todavia.</p>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {dias.map((d: any) => (
+                                        <div key={d.fecha} className="flex items-center justify-between gap-3 border border-[#e5e5e5] rounded-sm px-3 py-2">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-[#051620]">{d.fecha}</p>
+                                                <p className="text-xs text-[#666] truncate">{d.motivo}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFechaAEliminar(d)}
+                                                className="text-red-600 hover:text-red-700 cursor-pointer flex-shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </div>
+                </>
+            )}
 
             {/* Modal eliminar */}
             {fechaAEliminar && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-sm max-w-sm w-full p-6">
                         <div className="flex items-center gap-2.5 mb-2">
                             <Ban className="w-5 h-5 text-red-600" />
@@ -364,7 +416,7 @@ export default function DiasBloqueadosAdminPage() {
 
             {/* Modal bloquear */}
             {diasABloquear && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-sm max-w-sm w-full p-6">
                         <div className="flex items-center gap-2.5 mb-2">
                             <Ban className="w-5 h-5 text-[#051620]" />

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calendar, dateFnsLocalizer, type View } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../../styles/booking-calendar.css';
-import { Trash2, Ban, Car, Search, RotateCcw, MapPin } from 'lucide-react';
+import { Trash2, Ban, Car, Search, RotateCcw, MapPin, CalendarClock, X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { Input } from '../../components/ui/Input';
 
@@ -110,7 +110,30 @@ export default function VehiculosBloqueadosAdminPage() {
     const [rangoABloquear, setRangoABloquear] = useState<{ inicio: string; fin: string } | null>(null);
     const [motivoBloqueo, setMotivoBloqueo] = useState('');
     const [intentoBloquear, setIntentoBloquear] = useState(false);
+    const [panelAbierto, setPanelAbierto] = useState(false);
+    const [cerrandoPanel, setCerrandoPanel] = useState(false);
     const queryClient = useQueryClient();
+
+    function abrirPanel() {
+        setPanelAbierto(true);
+    }
+
+    function cerrarPanel() {
+        setCerrandoPanel(true);
+        setTimeout(() => {
+            setPanelAbierto(false);
+            setCerrandoPanel(false);
+        }, 260);
+    }
+
+    useEffect(() => {
+        if (!panelAbierto) return;
+        const overflowPrevio = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = overflowPrevio;
+        };
+    }, [panelAbierto]);
 
     const sedesQuery = useQuery({
         queryKey: ['admin-sedes-lista-bloqueos'],
@@ -372,83 +395,115 @@ export default function VehiculosBloqueadosAdminPage() {
                     Selecciona un vehiculo para ver y gestionar sus fechas bloqueadas.
                 </p>
             ) : (
-                <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
-                        <div className="flex items-center gap-2 mb-3 text-sm font-medium text-[#051620]">
+                <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-[#051620]">
                             <Car className="w-4 h-4" />
                             {vehiculoSeleccionado ? 'KIA ' + vehiculoSeleccionado.modelo + ' - ' + vehiculoSeleccionado.placa : ''}
                         </div>
-                        <Calendar
-                            localizer={localizer}
-                            culture="es"
-                            events={[]}
-                            startAccessor="start"
-                            endAccessor="end"
-                            views={['month']}
-                            view={vista}
-                            onView={setVista}
-                            date={fechaVisible}
-                            onNavigate={setFechaVisible}
-                            selectable={true}
-                            longPressThreshold={150}
-                            onSelectSlot={onSeleccionCalendario}
-                            formats={{
-                                monthHeaderFormat: (date: Date) => format(date, 'MMMM yyyy', { locale: es }),
-                                weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
-                            }}
-                            dayPropGetter={getDayPropGetter(bloqueos, diasBloqueadosGlobal)}
-                            components={{
-                                month: {
-                                    dateHeader: (props: any) => DiaPersonalizado(props, bloqueos, diasBloqueadosGlobal, onDiaClick),
-                                },
-                            }}
-                            style={{ height: 560 }}
-                            messages={{
-                                month: 'Mes', today: 'Hoy', previous: 'Anterior', next: 'Siguiente',
-                            }}
-                        />
-                        <p className="text-xs text-[#999] mt-3">
-                            Click en un dia libre para bloquearlo, o arrastra el mouse sobre varios dias para bloquear un rango. Click en un dia bloqueado (rojo) para desbloquearlo. Los dias grises son festivos o fechas especiales (se gestionan en "Dias bloqueados").
-                        </p>
-                    </div>
-
-                    <div className="bg-white border border-[#e5e5e5] rounded-sm p-4">
-                        <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
+                        <button
+                            type="button"
+                            onClick={abrirPanel}
+                            className="inline-flex items-center gap-2 bg-[#051620] text-white text-sm font-medium px-4 py-2.5 rounded-sm cursor-pointer hover:bg-[#0a2030] flex-shrink-0"
+                        >
+                            <CalendarClock className="w-4 h-4" />
                             Bloqueos de este vehiculo ({bloqueos.length})
-                        </p>
-                        {bloqueosQuery.isLoading ? (
-                            <p className="text-sm text-[#666]">Cargando...</p>
-                        ) : bloqueos.length === 0 ? (
-                            <p className="text-sm text-[#666]">Este vehiculo no tiene bloqueos.</p>
-                        ) : (
-                            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-3 pb-4">
-                                {bloqueos.map((b) => (
-                                    <div key={b.id} className="flex items-center justify-between gap-3 border border-[#e5e5e5] rounded-sm px-3 py-2">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-[#051620]">
-                                                {b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : b.fecha_inicio + ' - ' + b.fecha_fin}
-                                            </p>
-                                            <p className="text-xs text-[#666] truncate">{b.motivo}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setBloqueoAEliminar(b)}
-                                            title="Eliminar"
-                                            className="text-red-600 hover:text-red-700 cursor-pointer flex-shrink-0"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        </button>
                     </div>
+                    <Calendar
+                        localizer={localizer}
+                        culture="es"
+                        events={[]}
+                        startAccessor="start"
+                        endAccessor="end"
+                        views={['month']}
+                        view={vista}
+                        onView={setVista}
+                        date={fechaVisible}
+                        onNavigate={setFechaVisible}
+                        selectable={true}
+                        longPressThreshold={150}
+                        onSelectSlot={onSeleccionCalendario}
+                        formats={{
+                            monthHeaderFormat: (date: Date) => format(date, 'MMMM yyyy', { locale: es }),
+                            weekdayFormat: (date: Date) => format(date, 'EEE', { locale: es }),
+                        }}
+                        dayPropGetter={getDayPropGetter(bloqueos, diasBloqueadosGlobal)}
+                        components={{
+                            month: {
+                                dateHeader: (props: any) => DiaPersonalizado(props, bloqueos, diasBloqueadosGlobal, onDiaClick),
+                            },
+                        }}
+                        style={{ height: 'calc(100vh - 220px)' }}
+                        messages={{
+                            month: 'Mes', today: 'Hoy', previous: 'Anterior', next: 'Siguiente',
+                        }}
+                    />
+                    <p className="text-xs text-[#999] mt-3">
+                        Click en un dia libre para bloquearlo, o arrastra el mouse sobre varios dias para bloquear un rango. Click en un dia bloqueado (rojo) para desbloquearlo. Los dias grises son festivos o fechas especiales (se gestionan en "Dias bloqueados").
+                    </p>
                 </div>
+            )}
+
+            {/* Panel lateral: bloqueos de este vehiculo */}
+            {panelAbierto && (
+                <>
+                    <div
+                        className={'fixed inset-0 z-50 bg-black/50' + (cerrandoPanel ? ' animate-fade-out-backdrop' : '')}
+                        onClick={cerrarPanel}
+                    />
+                    <div className={'fixed inset-y-0 right-0 z-[60] w-full sm:w-[420px] bg-white shadow-2xl overflow-y-auto scroll-fino ' + (cerrandoPanel ? 'animate-slide-out-right' : 'animate-slide-in-right')}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e5e5]">
+                            <p className="font-display text-lg font-bold text-[#051620]">
+                                Bloqueos {vehiculoSeleccionado ? '- KIA ' + vehiculoSeleccionado.modelo : ''}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={cerrarPanel}
+                                className="text-[#666] hover:text-[#051620] cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-5">
+                            <p className="text-xs font-medium text-[#051620]/40 uppercase tracking-widest mb-3">
+                                Bloqueos de este vehiculo ({bloqueos.length})
+                            </p>
+                            {bloqueosQuery.isLoading ? (
+                                <p className="text-sm text-[#666]">Cargando...</p>
+                            ) : bloqueos.length === 0 ? (
+                                <p className="text-sm text-[#666]">Este vehiculo no tiene bloqueos.</p>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {bloqueos.map((b) => (
+                                        <div key={b.id} className="flex items-center justify-between gap-3 border border-[#e5e5e5] rounded-sm px-3 py-2">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-[#051620]">
+                                                    {b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : b.fecha_inicio + ' - ' + b.fecha_fin}
+                                                </p>
+                                                <p className="text-xs text-[#666] truncate">{b.motivo}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBloqueoAEliminar(b)}
+                                                title="Eliminar"
+                                                className="text-red-600 hover:text-red-700 cursor-pointer flex-shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Modal eliminar */}
             {bloqueoAEliminar && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-sm max-w-sm w-full p-6">
                         <div className="flex items-center gap-2.5 mb-2">
                             <Ban className="w-5 h-5 text-red-600" />
@@ -490,7 +545,7 @@ export default function VehiculosBloqueadosAdminPage() {
 
             {/* Modal bloquear */}
             {rangoABloquear && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white rounded-sm max-w-sm w-full p-6">
                         <div className="flex items-center gap-2.5 mb-2">
                             <Ban className="w-5 h-5 text-[#051620]" />

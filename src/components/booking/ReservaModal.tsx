@@ -113,6 +113,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
 
   // Asignacion final del vehiculo especifico: debe ser del MISMO modelo elegido
   const poolModeloDelDia = vehiculosDisponiblesEseDia(pool, fecha, picoPlacaConfigQuery.data || [], vehiculosBloqueados);
+  const sinUnidadesDelModelo = !picoPlacaConfigQuery.isLoading && !vehiculosBloqueadosQuery.isLoading && poolModeloDelDia.length === 0;
 
   const conductorQuery = useQuery({
     queryKey: ['conductor-disponible', vehiculo.sede_id, fecha, horaSel],
@@ -280,9 +281,15 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
 
       const conductor = conductorQuery.data;
 
+      if (poolModeloDelDia.length === 0) {
+        setErrorMsg('Ese dia no hay ningun KIA ' + vehiculo.modelo + ' disponible (pico y placa u otra restriccion). Elige otro dia o cambia de vehiculo.');
+        setEnviando(false);
+        return;
+      }
+
       const vehiculoAsignadoId = await asignarVehiculoDisponible(poolModeloDelDia, fecha, horaSel + ':00');
       if (!vehiculoAsignadoId) {
-        setErrorMsg('Ese horario ya fue reservado. Elige otro.');
+        setErrorMsg('Ese horario ya fue reservado para este modelo. Elige otro horario.');
         setEnviando(false);
         return;
       }
@@ -354,7 +361,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
         variant="primary"
         size="lg"
         loading={enviando}
-        disabled={enviando}
+        disabled={enviando || sinUnidadesDelModelo}
         className="w-full"
       >
         Confirmar reserva
@@ -466,7 +473,7 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
         </div>
 
         {errorMsg && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3">
+          <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-sm px-4 py-3 mb-6">
             {errorMsg}
           </p>
         )}
@@ -617,12 +624,30 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
     </div>
   );
 
+  const overlaySinUnidades = sinUnidadesDelModelo && (
+    <div className="absolute inset-0 z-10 bg-white/90 backdrop-blur-[1px] flex items-center justify-center p-6">
+      <div className="text-center max-w-xs">
+        <p className="font-display text-base font-bold text-[#051620] mb-1">
+          No hay vehiculos disponibles
+        </p>
+        <p className="text-sm text-[#666]">
+          La unica unidad de KIA {vehiculo.modelo} en esta sede esta en pico y placa (u otra restriccion) ese dia. Elige otro dia o cambia de vehiculo.
+        </p>
+      </div>
+    </div>
+  );
+
   if (variant === 'panel') {
     return (
       <div className="h-full flex flex-col">
         {encabezado}
-        <div className="flex-1 overflow-y-auto scroll-fino">
-          {cuerpo}
+        <div className="relative flex-1 min-h-0">
+          <div className="h-full overflow-y-auto scroll-fino">
+            <div className={sinUnidadesDelModelo ? 'pointer-events-none select-none' : ''}>
+              {cuerpo}
+            </div>
+          </div>
+          {overlaySinUnidades}
         </div>
         {pie}
       </div>
@@ -633,8 +658,13 @@ export function ReservaModal({ vehiculo, vehiculosPool, vehiculosSede, zona, fec
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-sm max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {encabezado}
-        <div className="flex-1 overflow-y-auto scroll-fino">
-          {cuerpo}
+        <div className="relative flex-1 min-h-0">
+          <div className="h-full overflow-y-auto scroll-fino">
+            <div className={sinUnidadesDelModelo ? 'pointer-events-none select-none' : ''}>
+              {cuerpo}
+            </div>
+          </div>
+          {overlaySinUnidades}
         </div>
         {pie}
       </div>

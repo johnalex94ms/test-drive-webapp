@@ -409,10 +409,6 @@ export default function ConductoresAdminPage() {
                 >
                     <RotateCcw className="w-4 h-4 text-[#666]" />
                 </button>
-
-                <p className="text-xs text-[#999] whitespace-nowrap pb-2">
-                    {conductores.length} de {conductoresBase.length}
-                </p>
             </div>
 
             {conductoresQuery.isLoading ? (
@@ -491,11 +487,11 @@ export default function ConductoresAdminPage() {
                         </table>
                     </div>
 
-                    {totalPaginas > 1 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <p className="text-xs text-[#666]">
-                                Pagina {pagina} de {totalPaginas}
-                            </p>
+                    <div className="flex items-center justify-between mt-4">
+                        <p className="text-xs text-[#999]">
+                            {totalPaginas > 1 ? 'Pagina ' + pagina + ' de ' + totalPaginas + ' | ' : ''}{conductores.length} de {conductoresBase.length}
+                        </p>
+                        {totalPaginas > 1 && (
                             <div className="flex gap-2">
                                 <button
                                     type="button"
@@ -514,8 +510,8 @@ export default function ConductoresAdminPage() {
                                     <ChevronRight className="w-4 h-4 text-[#051620]" />
                                 </button>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </>
             )}
 
